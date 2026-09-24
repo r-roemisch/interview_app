@@ -1,0 +1,275 @@
+# =============================================================================
+# Secrets & environment
+# =============================================================================
+.env
+.env.*
+!.env.example
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials.json
+service-account*.json
+
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+.python-version.bak
+
+# uv / pip / poetry / pdm
+# (keep uv.lock committed for apps; uncomment to ignore for libraries)
+# uv.lock
+.pdm.toml
+.pdm-python
+.pdm-build/
+poetry.toml
+
+# Testing & coverage
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+nosetests.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Type checkers & linters
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+.pylint.d/
+
+# Jupyter
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+profile_default/
+ipython_config.py
+
+# =============================================================================
+# FastAPI / web backend
+# =============================================================================
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+instance/
+uploads/
+media/
+staticfiles/
+celerybeat-schedule
+celerybeat.pid
+alembic/versions/__pycache__/
+
+# =============================================================================
+# LLM / ML artifacts
+# =============================================================================
+*.ckpt
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.pth
+*.onnx
+*.h5
+models/
+checkpoints/
+embeddings/
+vector_store/
+chroma/
+chroma_db/
+.chroma/
+faiss_index/
+*.faiss
+*.index
+lancedb/
+.langchain.db
+.langsmith/
+wandb/
+mlruns/
+mlflow/
+.cache/huggingface/
+.cache/torch/
+transcripts/
+conversations/
+*.jsonl.gz
+
+# =============================================================================
+# Node.js
+# =============================================================================
+node_modules/
+jspm_packages/
+bower_components/
+web_modules/
+.npm
+.yarn-integrity
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+.pnpm-store/
+.pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+.node_repl_history
+*.tgz
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# =============================================================================
+# React / Next.js / bundlers
+# =============================================================================
+.next/
+out/
+next-env.d.ts
+.vercel
+.netlify
+.turbo/
+.swc/
+.parcel-cache/
+.cache/
+.vite/
+.nuxt/
+.output/
+.svelte-kit/
+storybook-static/
+*.local
+public/sw.js
+public/workbox-*.js
+public/sitemap*.xml
+public/robots.txt.bak
+
+# Frontend testing
+/coverage
+cypress/videos/
+cypress/screenshots/
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
+
+# =============================================================================
+# HTML / CSS build output
+# =============================================================================
+*.min.css
+*.min.js
+*.css.map
+*.js.map
+.sass-cache/
+*.scssc
+
+# =============================================================================
+# Docker / infra
+# =============================================================================
+docker-compose.override.yml
+.dockerignore.bak
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# =============================================================================
+# Editors & IDEs
+# =============================================================================
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.spyderproject
+.spyproject
+.ropeproject
+*.sublime-workspace
+*.sublime-project
+.history/
+
+# =============================================================================
+# OS
+# =============================================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# =============================================================================
+# Logs & temp
+# =============================================================================
+logs/
+*.log
+*.log.*
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig
+*.pid
+*.seed
+.pid.lock
+
+# =============================================================================
+# AI assistant tooling
+# =============================================================================
+.claude/settings.local.json
+.claude/*.local.*
+.cursor/
+.aider*
+.copilot/

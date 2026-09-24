@@ -1,0 +1,7 @@
+1. conversation
+    10 questions and user answers
+2. easy, normal, hard, rude
+3. Job (job description, job title, industry)
+4. seniority
+5. end evaluation based on star
+6. recommendation
