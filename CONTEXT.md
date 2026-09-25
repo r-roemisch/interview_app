@@ -29,12 +29,16 @@ _Avoid_: Mode, level, rude
 ### Interview
 
 **Interview**:
-One practice session: a live, turn-based conversation between the interviewer and the candidate for a given Job and Difficulty, capped at ten interviewer Questions, ending in an Evaluation. An Interview is In Progress, Completed, or Evaluation Missing.
+One practice session: a live, turn-based conversation between the interviewer and the candidate for a given Job and Difficulty, capped at ten interviewer Questions, ending in an Evaluation. An Interview is In Progress, Judging, Completed, or Evaluation Missing.
 _Avoid_: Session, conversation, chat
 
 **In Progress**:
 An Interview that still accepts Answers. It can be resumed from History.
 _Avoid_: Active, open, running
+
+**Judging**:
+An Interview that no longer accepts Answers and whose Evaluation is being produced by the Judge.
+_Avoid_: Pending, evaluating, processing
 
 **Completed**:
 An Interview that no longer accepts Answers and has an Evaluation.

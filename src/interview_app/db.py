@@ -26,6 +26,11 @@ def create_tables() -> None:
     Base.metadata.create_all(bind=engine)
 
 
+def get_session_factory() -> sessionmaker:
+    """FastAPI dependency for code that must open its own session (background tasks)."""
+    return SessionLocal
+
+
 def get_db() -> Iterator[Session]:
     db = SessionLocal()
     try:

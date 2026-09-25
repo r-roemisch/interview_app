@@ -23,7 +23,7 @@ A single-user, local, capstone-grade web app where a candidate rehearses a behav
 - After the 10th Answer or early end, the interviewer LLM writes a Closing (told explicitly if the candidate ended early). The Judge starts immediately in the background. The UI shows the Closing and a "See evaluation" button that enables when the Evaluation exists.
 - Every Question, Answer and Closing is persisted as it happens. In Progress Interviews resume from History.
 - LLM failure: 2 automatic retries, then error with a Retry button. Interview state must be unchanged on failure.
-- Interview status: In Progress, Completed, Evaluation Missing.
+- Interview status: In Progress, Judging (Closing given, Judge running), Completed, Evaluation Missing.
 
 ## Evaluation
 
@@ -45,7 +45,7 @@ A single-user, local, capstone-grade web app where a candidate rehearses a behav
 - Backend at repo root: uv, Python 3.12, FastAPI, SQLAlchemy 2 + SQLite (`create_all` at startup, no migrations), Pydantic v2, `openai` SDK with `base_url` = OpenRouter. Default model `google/gemma-4-31b-it:free`, env-configurable, no automatic fallback.
 - Frontend in `frontend/`: Next.js App Router, TypeScript, Tailwind, no component library, every page `"use client"` (ADR-0001). Pages: Setup `/`, Interview `/interviews/[id]`, Evaluation `/interviews/[id]/evaluation`, History `/history`.
 - Tests: pytest for backend with a fake LLM client. No frontend tests.
-- `.env` replaced with only: `OPENROUTER_API_KEY`, `LLM_MODEL`, `DATABASE_URL`, `CORS_ORIGINS`, `NEXT_PUBLIC_API_URL`.
+- `.env` replaced with only: `LLM_PROVIDER` (`openrouter` or `fake`, an offline scripted model for development), `OPENROUTER_API_KEY`, `LLM_MODEL`, `DATABASE_URL`, `CORS_ORIGINS`; frontend `.env.local` has `NEXT_PUBLIC_API_URL`.
 
 ## API (JSON, no auth)
 
@@ -65,7 +65,7 @@ A single-user, local, capstone-grade web app where a candidate rehearses a behav
 
 ## Data model
 
-- `interviews`: id, title, industry, seniority, job_description, difficulty, status (`in_progress` / `completed` / `evaluation_missing`), created_at, ended_early (bool).
+- `interviews`: id, title, industry, seniority, job_description, difficulty, status (`in_progress` / `judging` / `completed` / `evaluation_missing`), created_at, ended_early (bool).
 - `messages`: id, interview_id, role (`question` / `answer` / `closing`), text, position.
 - `evaluations`: id, interview_id (unique), overall_score, justification, verdict, improvement_points (JSON), star_breakdowns (JSON: one per Answer with s/t/a/r ratings and comments), created_at.
 

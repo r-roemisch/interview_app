@@ -1,0 +1,117 @@
+"""Judge: turns a finished transcript into an Evaluation. Runs in the background after the Closing."""
+
+from __future__ import annotations
+
+import json
+import logging
+from collections.abc import Callable
+
+from pydantic import ValidationError
+from sqlalchemy.orm import Session
+
+from interview_app import db as db_module
+from interview_app.llm import LLMClient, LLMUnavailable, _default_client, strip_code_fence
+from interview_app.models import Evaluation, Interview, InterviewStatus, MessageRole
+from interview_app.prompts.judge import JudgeOutput, judge_json_schema, messages_for_judge
+
+log = logging.getLogger(__name__)
+
+SessionFactory = Callable[[], Session]
+
+
+class JudgeOutputInvalid(Exception):
+    pass
+
+
+def _parse(raw: str, expected_answers: int) -> JudgeOutput:
+    try:
+        data = json.loads(strip_code_fence(raw))
+    except json.JSONDecodeError as exc:
+        raise JudgeOutputInvalid(f"not valid JSON ({exc.msg})") from exc
+    try:
+        out = JudgeOutput.model_validate(data)
+    except ValidationError as exc:
+        raise JudgeOutputInvalid(str(exc)) from exc
+    if len(out.answers) != expected_answers:
+        raise JudgeOutputInvalid(
+            f"`answers` has {len(out.answers)} entries, expected {expected_answers}"
+        )
+    return out
+
+
+def _to_evaluation(interview: Interview, out: JudgeOutput) -> Evaluation:
+    answer_positions = [m.position for m in interview.messages if m.role == MessageRole.ANSWER]
+    breakdowns = [
+        {"position": pos, **assessment.model_dump()}
+        for pos, assessment in zip(answer_positions, out.answers, strict=True)
+    ]
+    return Evaluation(
+        overall_score=out.overall_score,
+        justification=out.justification.strip(),
+        verdict=out.verdict,
+        improvement_points=[p.strip() for p in out.improvement_points],
+        star_breakdowns=breakdowns,
+    )
+
+
+def run_judge(db: Session, llm: LLMClient, interview: Interview) -> Interview:
+    """Judge the Interview: Completed on success, Evaluation Missing on failure. Always commits."""
+    if interview.status not in (
+        InterviewStatus.JUDGING,
+        InterviewStatus.COMPLETED,
+        InterviewStatus.EVALUATION_MISSING,
+    ):
+        raise ValueError("Interview has not ended")
+
+    expected = interview.answer_count
+    schema = judge_json_schema()
+    previous_error: str | None = None
+    output: JudgeOutput | None = None
+    for attempt in (1, 2):
+        try:
+            raw = llm.complete(messages_for_judge(interview, previous_error=previous_error), json_schema=schema)
+            output = _parse(raw, expected)
+            break
+        except JudgeOutputInvalid as exc:
+            previous_error = str(exc)[:500]
+            log.warning("Judge output invalid for interview %s (attempt %d): %s", interview.id, attempt, exc)
+        except LLMUnavailable as exc:
+            log.error("Judge LLM unavailable for interview %s: %s", interview.id, exc)
+            break
+
+    if output is None:
+        interview.evaluation = None
+        interview.status = InterviewStatus.EVALUATION_MISSING
+    else:
+        interview.evaluation = _to_evaluation(interview, output)
+        interview.status = InterviewStatus.COMPLETED
+    db.commit()
+    db.refresh(interview)
+    return interview
+
+
+def run_judge_in_background(
+    interview_id: int,
+    *,
+    session_factory: SessionFactory | None = None,
+    llm: LLMClient | None = None,
+) -> None:
+    """Entry point for FastAPI BackgroundTasks. Uses its own session because the request's is closed."""
+    factory = session_factory or db_module.SessionLocal
+    client = llm or _default_client()
+    db = factory()
+    try:
+        interview = db.get(Interview, interview_id)
+        if interview is None:
+            log.warning("Judge: interview %s vanished before judging", interview_id)
+            return
+        run_judge(db, client, interview)
+    except Exception:
+        log.exception("Judge crashed for interview %s", interview_id)
+        db.rollback()
+        interview = db.get(Interview, interview_id)
+        if interview is not None and interview.status == InterviewStatus.JUDGING:
+            interview.status = InterviewStatus.EVALUATION_MISSING
+            db.commit()
+    finally:
+        db.close()

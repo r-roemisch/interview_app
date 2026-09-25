@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from interview_app.config import get_settings
 from interview_app.db import create_tables
+from interview_app.routers import interviews, recommend
 
 
 @asynccontextmanager
@@ -23,6 +24,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    app.include_router(interviews.router)
+    app.include_router(recommend.router)
 
     @app.get("/health")
     def health() -> dict[str, str]:

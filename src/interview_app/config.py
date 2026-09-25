@@ -8,6 +8,8 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
+    # "openrouter" for real calls, "fake" for a scripted interviewer/judge (no key, no network)
+    llm_provider: str = "openrouter"
     openrouter_api_key: str = ""
     llm_model: str = "google/gemma-4-31b-it:free"
     database_url: str = "sqlite:///./interview.db"

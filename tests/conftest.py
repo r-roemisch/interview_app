@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from interview_app import db as db_module
-from interview_app.db import Base, get_db
+from interview_app.db import Base, get_db, get_session_factory
+from interview_app.llm import FakeLLMClient, get_llm_client
 from interview_app.main import create_app
 
 
@@ -36,15 +37,28 @@ def db(engine) -> Iterator[Session]:
 
 
 @pytest.fixture
-def client(engine, db, monkeypatch) -> Iterator[TestClient]:
-    """TestClient wired to the in-memory database, with startup table creation pointed at it."""
+def llm() -> FakeLLMClient:
+    """Scripted LLM. Tests append to `llm.responses` before making requests."""
+    return FakeLLMClient()
+
+
+@pytest.fixture
+def client(engine, db, llm, monkeypatch) -> Iterator[TestClient]:
+    """TestClient wired to the in-memory database and the fake LLM."""
     monkeypatch.setattr(db_module, "engine", engine)
     app = create_app()
 
     def override_get_db():
         yield db
 
+    def override_llm():
+        yield llm
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_llm_client] = override_llm
+    app.dependency_overrides[get_session_factory] = lambda: sessionmaker(
+        bind=engine, autoflush=False, expire_on_commit=False
+    )
     with TestClient(app) as c:
         yield c
 
