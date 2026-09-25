@@ -5,3 +5,7 @@
 4. seniority
 5. end evaluation based on star
 6. recommendation
+
+
+integrating jev as llm-as-a-judge
+creating a picture of the interviewer

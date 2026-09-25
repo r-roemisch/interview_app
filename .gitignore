@@ -273,3 +273,6 @@ temp/
 .cursor/
 .aider*
 .copilot/
+
+# Local SQLite database
+interview.db
