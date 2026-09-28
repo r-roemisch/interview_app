@@ -8,8 +8,10 @@ from sqlalchemy.pool import StaticPool
 
 from interview_app import db as db_module
 from interview_app.db import Base, get_db, get_session_factory
+from interview_app.jev import FakeJevClient, get_jev_client
 from interview_app.llm import FakeLLMClient, get_llm_client
 from interview_app.main import create_app
+from interview_app.speech import FakeSpeechClient, get_speech_client
 
 
 @pytest.fixture
@@ -43,7 +45,19 @@ def llm() -> FakeLLMClient:
 
 
 @pytest.fixture
-def client(engine, db, llm, monkeypatch) -> Iterator[TestClient]:
+def jev() -> FakeJevClient:
+    """Scripted JEV. Tests append answer dicts to `jev.responses`."""
+    return FakeJevClient()
+
+
+@pytest.fixture
+def speech() -> FakeSpeechClient:
+    """Fixed speech and transcription. Set `speech.error` to make every call fail."""
+    return FakeSpeechClient()
+
+
+@pytest.fixture
+def client(engine, db, llm, jev, speech, monkeypatch) -> Iterator[TestClient]:
     """TestClient wired to the in-memory database and the fake LLM."""
     monkeypatch.setattr(db_module, "engine", engine)
     app = create_app()
@@ -56,6 +70,8 @@ def client(engine, db, llm, monkeypatch) -> Iterator[TestClient]:
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_llm_client] = override_llm
+    app.dependency_overrides[get_jev_client] = lambda: jev
+    app.dependency_overrides[get_speech_client] = lambda: speech
     app.dependency_overrides[get_session_factory] = lambda: sessionmaker(
         bind=engine, autoflush=False, expire_on_commit=False
     )

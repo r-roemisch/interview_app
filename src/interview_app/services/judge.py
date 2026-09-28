@@ -1,4 +1,7 @@
-"""Judge: turns a finished transcript into an Evaluation. Runs in the background after the Closing."""
+"""Judge: turns a finished transcript into an Evaluation. Runs in the background after the Closing.
+
+Two Judges (ADR-0003): the LLM Judge here, the JEV Judge in `jev_judge`.
+"""
 
 from __future__ import annotations
 
@@ -10,9 +13,11 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from interview_app import db as db_module
+from interview_app.jev import JevClient, _default_jev_client
 from interview_app.llm import LLMClient, LLMUnavailable, _default_client, strip_code_fence
-from interview_app.models import Evaluation, Interview, InterviewStatus, MessageRole
+from interview_app.models import Evaluation, Interview, InterviewStatus, Judge, MessageRole
 from interview_app.prompts.judge import JudgeOutput, judge_json_schema, messages_for_judge
+from interview_app.services import jev_judge
 
 log = logging.getLogger(__name__)
 
@@ -54,8 +59,44 @@ def _to_evaluation(interview: Interview, out: JudgeOutput) -> Evaluation:
     )
 
 
-def run_judge(db: Session, llm: LLMClient, interview: Interview) -> Interview:
-    """Judge the Interview: Completed on success, Evaluation Missing on failure. Always commits."""
+def _llm_evaluation(llm: LLMClient, interview: Interview) -> Evaluation | None:
+    """The LLM Judge: one retry on invalid output, none when the model is unavailable."""
+    expected = interview.answer_count
+    schema = judge_json_schema()
+    previous_error: str | None = None
+    for attempt in (1, 2):
+        try:
+            raw = llm.complete(messages_for_judge(interview, previous_error=previous_error), json_schema=schema)
+            return _to_evaluation(interview, _parse(raw, expected))
+        except JudgeOutputInvalid as exc:
+            previous_error = str(exc)[:500]
+            log.warning("Judge output invalid for interview %s (attempt %d): %s", interview.id, attempt, exc)
+        except LLMUnavailable as exc:
+            log.error("Judge LLM unavailable for interview %s: %s", interview.id, exc)
+            return None
+    return None
+
+
+def evaluate(judge: Judge, interview: Interview, *, llm: LLMClient, jev: JevClient) -> Evaluation | None:
+    if judge == Judge.JEV:
+        return jev_judge.evaluate(jev, interview)
+    return _llm_evaluation(llm, interview)
+
+
+def replace_evaluation(db: Session, interview: Interview, judge: Judge, evaluation: Evaluation | None) -> None:
+    """Swap one Judge's Evaluation. The old row is deleted and flushed first, so the
+    (interview_id, judge) unique constraint never sees two rows."""
+    old = interview.evaluation_by(judge)
+    if old is not None:
+        interview.evaluations.remove(old)
+        db.flush()
+    if evaluation is not None:
+        evaluation.judge = judge
+        interview.evaluations.append(evaluation)
+
+
+def run_judge(db: Session, llm: LLMClient, interview: Interview, *, jev: JevClient | None = None) -> Interview:
+    """Run the chosen Judge: Completed on success, Evaluation Missing on failure. Always commits."""
     if interview.status not in (
         InterviewStatus.JUDGING,
         InterviewStatus.COMPLETED,
@@ -63,31 +104,24 @@ def run_judge(db: Session, llm: LLMClient, interview: Interview) -> Interview:
     ):
         raise ValueError("Interview has not ended")
 
-    expected = interview.answer_count
-    schema = judge_json_schema()
-    previous_error: str | None = None
-    output: JudgeOutput | None = None
-    for attempt in (1, 2):
-        try:
-            raw = llm.complete(messages_for_judge(interview, previous_error=previous_error), json_schema=schema)
-            output = _parse(raw, expected)
-            break
-        except JudgeOutputInvalid as exc:
-            previous_error = str(exc)[:500]
-            log.warning("Judge output invalid for interview %s (attempt %d): %s", interview.id, attempt, exc)
-        except LLMUnavailable as exc:
-            log.error("Judge LLM unavailable for interview %s: %s", interview.id, exc)
-            break
-
-    if output is None:
-        interview.evaluation = None
-        interview.status = InterviewStatus.EVALUATION_MISSING
-    else:
-        interview.evaluation = _to_evaluation(interview, output)
-        interview.status = InterviewStatus.COMPLETED
+    evaluation = evaluate(interview.judge, interview, llm=llm, jev=jev or _default_jev_client())
+    replace_evaluation(db, interview, interview.judge, evaluation)
+    interview.status = InterviewStatus.COMPLETED if evaluation else InterviewStatus.EVALUATION_MISSING
     db.commit()
     db.refresh(interview)
     return interview
+
+
+def run_other_judge(db: Session, llm: LLMClient, jev: JevClient, interview: Interview, judge: Judge) -> Evaluation | None:
+    """Run the Judge that was not chosen, for the comparison. Replaces that Judge's earlier Evaluation
+    on success; on failure nothing changes. Never touches the status (spec: Evaluation page)."""
+    evaluation = evaluate(judge, interview, llm=llm, jev=jev)
+    if evaluation is None:
+        return None
+    replace_evaluation(db, interview, judge, evaluation)
+    db.commit()
+    db.refresh(evaluation)
+    return evaluation
 
 
 def run_judge_in_background(
@@ -95,6 +129,7 @@ def run_judge_in_background(
     *,
     session_factory: SessionFactory | None = None,
     llm: LLMClient | None = None,
+    jev: JevClient | None = None,
 ) -> None:
     """Entry point for FastAPI BackgroundTasks. Uses its own session because the request's is closed."""
     factory = session_factory or db_module.SessionLocal
@@ -105,7 +140,7 @@ def run_judge_in_background(
         if interview is None:
             log.warning("Judge: interview %s vanished before judging", interview_id)
             return
-        run_judge(db, client, interview)
+        run_judge(db, client, interview, jev=jev)
     except Exception:
         log.exception("Judge crashed for interview %s", interview_id)
         db.rollback()

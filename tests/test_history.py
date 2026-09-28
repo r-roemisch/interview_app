@@ -2,7 +2,7 @@ import json
 
 from interview_app.models import Evaluation, Interview, Message
 
-PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering"})
+PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "Kore"})
 
 
 def _judge_reply(answers: int, score: int) -> str:
@@ -47,7 +47,7 @@ def test_history_lists_newest_first_with_status_and_score(client, llm):
     assert [r["status"] for r in rows] == ["evaluation_missing", "completed", "in_progress"]
     assert [r["overall_score"] for r in rows] == [None, 81, None]
     assert rows[2]["id"] == first
-    assert set(rows[0]) == {"id", "title", "created_at", "status", "overall_score"}
+    assert set(rows[0]) == {"id", "title", "created_at", "status", "judge", "overall_score"}
 
 
 def test_delete_cascades_and_is_idempotent_on_missing(client, llm, db):

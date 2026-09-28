@@ -6,5 +6,5 @@ The user picks a Judge per Interview: the LLM Judge (ADR-0002) or the JEV Judge,
 
 - An Interview holds at most one Evaluation per Judge. The status and the History score follow the chosen Judge; the other Judge can be run afterwards for a side-by-side comparison.
 - Overall Scores are only comparable between Interviews judged by the same Judge, so History shows which Judge produced each score.
-- JEV is called through the TypeSafe SDK, not the `openai` SDK, so the app has two model clients.
+- JEV is not a chat model: it is called with plain HTTP on OpenRouter's `/systemone` endpoint, not through the `openai` SDK, so the app has two model clients.
 - No automatic escalation from JEV to the LLM Judge: thresholds would need calibration data the project does not have. JEV's confidence is shown to the user instead.

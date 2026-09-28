@@ -1,6 +1,6 @@
 # Judge choice (LLM Judge or JEV Judge): spec
 
-Status: ready-for-agent
+Status: resolved
 Confirmed by the user on 2026-09-28 after a grilling session. Build order: after `cv-and-pdf-upload`, before `voice-interview`. Vocabulary in `CONTEXT.md` (Judge, LLM Judge, JEV Judge, Checklist, Evaluation). Decision record: ADR-0003. Extends `.scratch/interview-practice/spec.md`.
 
 ## Purpose
@@ -19,7 +19,7 @@ Unchanged (ADR-0002): the existing prompt, output and retry rules.
 
 ## The JEV Judge
 
-- One call to JEV (`typesafe/jev-1.13` through OpenRouter, TypeSafe SDK `typesafe-sdk`, existing OpenRouter key). Pin the version: confidence values are only meaningful for one version.
+- One call to JEV (`typesafe/jev-1.13` on OpenRouter's `/api/v1/systemone` endpoint, plain HTTP with `httpx`, existing OpenRouter key). Pin the version: confidence values are only meaningful for one version.
 - **State**: the Job snapshot and the full transcript with numbered Answers, in the same shape the LLM Judge receives. No CV, no Persona.
 - **Questions** in one call:
   - For each Answer N, four `score` questions (Situation, Task, Action, Result of Answer N), each with 5 level descriptions matching 1-5 ("1 = absent or very weak" … "5 = excellent"). The rating is JEV's score rounded to the nearest level, plus 1.
@@ -84,7 +84,7 @@ Unchanged (ADR-0002): the existing prompt, output and retry rules.
 
 - `JEV_MODEL`, default `typesafe/jev-1.13`.
 - `LLM_PROVIDER=fake` also fakes JEV with plausible scores, confidences and checklist probabilities.
-- README: the user must add `typesafe/jev-1.13` to the OpenRouter allow-list. When OpenRouter rejects a model because of the allow-list, the error message says which model and points to the allow-list.
+- JEV works on the user's key without an allow-list change (checked 2026-09-29). When OpenRouter rejects a model because of the allow-list, the error message says which model and points to the allow-list.
 
 ## Tests
 

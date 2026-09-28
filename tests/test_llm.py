@@ -65,7 +65,7 @@ def test_non_retryable_error_becomes_unavailable_without_retry(monkeypatch):
         )
 
     monkeypatch.setattr(client._client.chat.completions, "create", fake_create)
-    with pytest.raises(LLMUnavailable, match="blocked by guardrail"):
+    with pytest.raises(LLMUnavailable, match="test/model is not on your OpenRouter allow-list"):
         client.complete([{"role": "user", "content": "hi"}])
     assert len(attempts) == 1
 
@@ -125,6 +125,6 @@ def test_dev_fake_answers_each_prompt_kind():
     judge = json.loads(fake.complete([{"role": "system", "content": "You are an experienced hiring manager"}, {"role": "user", "content": "CANDIDATE (answer 1): x\n\nCANDIDATE (answer 2): y"}]))
     assert len(judge["answers"]) == 2 and judge["verdict"] == "hire"
     persona = json.loads(fake.complete([{"role": "system", "content": "You invent the interviewer"}, {"role": "user", "content": "Job: x"}]))
-    assert persona == {"name": "Sam Taylor", "title": "Engineering Manager"}
+    assert persona == {"name": "Sam Taylor", "title": "Engineering Manager", "voice": "Orus"}
     rec = json.loads(fake.complete([{"role": "system", "content": "You extract structured fields"}, {"role": "user", "content": "jd"}]))
     assert rec["seniority"] == "mid"

@@ -22,6 +22,18 @@ _DIFFICULTY_RULES = {
 }
 
 
+_CV_RULES = {
+    Difficulty.NORMAL: (
+        "This is the candidate's CV. Some of your questions may ask about real experiences from it; "
+        "most questions stay general."
+    ),
+    Difficulty.HARD: (
+        "This is the candidate's CV. Probe its claims: ask for the specifics, numbers and the "
+        "candidate's personal contribution behind what it says."
+    ),
+}
+
+
 def build_system_prompt(interview: Interview) -> str:
     industry = f" in the {interview.industry} industry" if interview.industry else ""
     parts = [
@@ -47,6 +59,10 @@ def build_system_prompt(interview: Interview) -> str:
             interview.job_description.strip(),
             "</job_description>",
         ]
+    # Easy ignores the CV entirely (CONTEXT.md: Difficulty).
+    cv_rule = _CV_RULES.get(interview.difficulty)
+    if interview.cv and cv_rule:
+        parts += [cv_rule, "<cv>", interview.cv.strip(), "</cv>"]
     return "\n".join(parts)
 
 

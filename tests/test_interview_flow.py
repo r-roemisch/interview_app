@@ -3,7 +3,7 @@ import json
 from interview_app.llm import LLMUnavailable
 from interview_app.models import Interview, Message
 
-PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering"})
+PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "Kore"})
 
 
 def _judge_reply(answers: int) -> str:

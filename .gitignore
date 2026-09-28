@@ -277,3 +277,6 @@ temp/
 
 # Local SQLite database
 interview.db
+
+# Personal to-do list
+TODO.md

@@ -1,13 +1,21 @@
 "use client";
 
-import { ArrowUp, ChevronDown, ClipboardCheck, Flag, RotateCw } from "lucide-react";
+import { ArrowUp, ChevronDown, ClipboardCheck, Flag, Loader2, Mic, RotateCw, Square, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { api, ApiError, type Interview, type Message } from "@/lib/api";
+import { api, ApiError, speechUrl, type Interview, type Message } from "@/lib/api";
 import { DIFFICULTY_OPTIONS, SENIORITY_OPTIONS, STAR_PARTS } from "@/lib/labels";
 import { Button, ErrorBanner, Page, PersonaAvatar, Spinner, StarLetter } from "../../ui";
 
 type EvaluationState = "polling" | "ready" | "missing";
+
+// Plays one interviewer message, stopping whatever was playing. Any failure (network, 503,
+// the browser blocking autoplay) is silent: the text is on screen and the replay button retries.
+function play(audioRef: React.RefObject<HTMLAudioElement | null>, url: string) {
+  audioRef.current?.pause();
+  audioRef.current = new Audio(url);
+  audioRef.current.play().catch(() => {});
+}
 
 // Interview page: the chat with the interviewer, plus a side panel with the Persona, the Job,
 // the Question tracker and a STAR reminder. Also handles resuming an in-progress Interview
@@ -28,6 +36,11 @@ export default function InterviewPage() {
   const [failed, setFailed] = useState<{ message: string; action?: "send" | "end" } | null>(null);
   const [evaluation, setEvaluation] = useState<EvaluationState>("polling");
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // Voice Interview: the audio playing now, which interviewer messages were already spoken
+  // (null until the first load), and a mute switch that is not saved.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const spokenRef = useRef<Set<number> | null>(null);
+  const [muted, setMuted] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   // Bumping this counter re-runs the loading effect (used by the Retry button).
   const [reloadKey, setReloadKey] = useState(0);
@@ -75,6 +88,30 @@ export default function InterviewPage() {
       clearTimeout(timer);
     };
   }, [ended, evaluation, interviewId]);
+
+  // Speak each new Question and the Closing once, as it arrives.
+  useEffect(() => {
+    if (!interview?.voice_interview) return;
+    const interviewerMessages = interview.messages.filter((m) => m.role !== "answer");
+    if (spokenRef.current === null) {
+      // First load: a fresh Interview speaks its first Question; a resumed one stays quiet.
+      const fresh = !interview.messages.some((m) => m.role === "answer");
+      spokenRef.current = new Set(fresh ? [] : interviewerMessages.map((m) => m.id));
+    }
+    const spoken = spokenRef.current;
+    const unspoken = interviewerMessages.filter((m) => !spoken.has(m.id));
+    unspoken.forEach((m) => spoken.add(m.id));
+    const latest = unspoken.at(-1);
+    if (latest && !muted) play(audioRef, speechUrl(interview.id, latest.id));
+  }, [interview, muted]);
+
+  // Stop speaking when leaving the page.
+  useEffect(() => () => audioRef.current?.pause(), []);
+
+  function toggleMute() {
+    if (!muted) audioRef.current?.pause();
+    setMuted(!muted);
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -138,7 +175,14 @@ export default function InterviewPage() {
 
   const answered = interview.messages.filter((m) => m.role === "answer").length + (pending !== null ? 1 : 0);
   const panel = (
-    <Panel interview={interview} answered={answered} onEnd={() => endEarly()} endDisabled={busy || answered === 0} />
+    <Panel
+      interview={interview}
+      answered={answered}
+      onEnd={() => endEarly()}
+      endDisabled={busy || answered === 0}
+      muted={muted}
+      onToggleMute={toggleMute}
+    />
   );
 
   return (
@@ -164,7 +208,13 @@ export default function InterviewPage() {
         <div className="flex-1 overflow-y-auto">
           <ol className="mx-auto max-w-2xl space-y-6 px-4 py-8">
             {interview.messages.map((m) => (
-              <Entry key={m.id} message={m} messages={interview.messages} personaName={interview.persona_name} />
+              <Entry
+                key={m.id}
+                message={m}
+                messages={interview.messages}
+                personaName={interview.persona_name}
+                onPlay={interview.voice_interview ? () => play(audioRef, speechUrl(interview.id, m.id)) : undefined}
+              />
             ))}
             {pending !== null && <AnswerBlock text={pending} dim />}
             {busy && (
@@ -184,7 +234,15 @@ export default function InterviewPage() {
             />
           )}
           {interview.status === "in_progress" ? (
-            <Composer draft={draft} setDraft={setDraft} onSend={send} busy={busy} personaName={interview.persona_name} />
+            <Composer
+              draft={draft}
+              setDraft={setDraft}
+              onSend={send}
+              busy={busy}
+              personaName={interview.persona_name}
+              // A transcription is added to whatever is already in the Answer box.
+              onTranscript={interview.voice_interview ? (text) => setDraft((d) => (d.trim() ? `${d.trimEnd()} ${text}` : text)) : undefined}
+            />
           ) : (
             <JudgingFooter
               state={evaluation}
@@ -207,11 +265,15 @@ function Panel({
   answered,
   onEnd,
   endDisabled,
+  muted,
+  onToggleMute,
 }: {
   interview: Interview;
   answered: number;
   onEnd: () => void;
   endDisabled: boolean;
+  muted: boolean;
+  onToggleMute: () => void;
 }) {
   const seniority = SENIORITY_OPTIONS.find((o) => o.value === interview.seniority)?.label;
   const difficulty = DIFFICULTY_OPTIONS.find((o) => o.value === interview.difficulty)?.label;
@@ -256,6 +318,13 @@ function Panel({
           ))}
         </ul>
       </div>
+
+      {interview.voice_interview && (
+        <Button variant="secondary" onClick={onToggleMute} aria-pressed={muted} className="w-full">
+          {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+          {muted ? "Unmute interviewer" : "Mute interviewer"}
+        </Button>
+      )}
 
       {interview.status === "in_progress" && (
         <Button variant="secondary" onClick={onEnd} disabled={endDisabled} className="w-full">
@@ -303,13 +372,36 @@ function QuestionTracker({ interview, answered, compact = false }: { interview: 
 }
 
 // Each Question is numbered, since the Interview really is a sequence of up to ten.
-function Entry({ message, messages, personaName }: { message: Message; messages: Message[]; personaName: string }) {
+// In a Voice Interview, interviewer messages get a replay button (`onPlay`).
+function Entry({
+  message,
+  messages,
+  personaName,
+  onPlay,
+}: {
+  message: Message;
+  messages: Message[];
+  personaName: string;
+  onPlay?: () => void;
+}) {
   if (message.role === "answer") return <AnswerBlock text={message.text} />;
+  const replay = onPlay && (
+    <button
+      onClick={onPlay}
+      aria-label="Play this message again"
+      className="shrink-0 rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-indigo-600 focus-visible:outline-2 focus-visible:outline-indigo-500 dark:hover:bg-zinc-800"
+    >
+      <Volume2 className="h-4 w-4" />
+    </button>
+  );
   if (message.role === "closing") {
     return (
-      <li className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-3 text-[15px] leading-relaxed dark:border-indigo-500/30 dark:bg-indigo-500/10">
-        <p className="mb-1 text-xs font-medium text-indigo-700 dark:text-indigo-300">Closing from {personaName}</p>
-        {message.text}
+      <li className="flex gap-2 rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-3 text-[15px] leading-relaxed dark:border-indigo-500/30 dark:bg-indigo-500/10">
+        <div className="flex-1">
+          <p className="mb-1 text-xs font-medium text-indigo-700 dark:text-indigo-300">Closing from {personaName}</p>
+          {message.text}
+        </div>
+        {replay}
       </li>
     );
   }
@@ -319,7 +411,8 @@ function Entry({ message, messages, personaName }: { message: Message; messages:
       <span className="w-5 shrink-0 pt-1 text-right text-sm font-semibold tabular-nums text-indigo-600 dark:text-indigo-400">
         {number}
       </span>
-      <p className="whitespace-pre-wrap text-[17px] font-medium leading-relaxed">{message.text}</p>
+      <p className="flex-1 whitespace-pre-wrap text-[17px] font-medium leading-relaxed">{message.text}</p>
+      {replay}
     </li>
   );
 }
@@ -354,13 +447,23 @@ function Composer({
   onSend,
   busy,
   personaName,
+  onTranscript,
 }: {
   draft: string;
   setDraft: (s: string) => void;
   onSend: () => void;
   busy: boolean;
   personaName: string;
+  onTranscript?: (text: string) => void; // set in a Voice Interview: shows the mic button
 }) {
+  const recorder = useRecorder(onTranscript ?? (() => {}));
+  const hint = busy
+    ? `${personaName} is reading your answer.`
+    : recorder.state === "recording"
+      ? `Recording ${formatSeconds(recorder.seconds)}. Click the square to stop.`
+      : recorder.state === "transcribing"
+        ? "Turning your recording into text..."
+        : (recorder.error ?? "Ctrl+Enter to send");
   return (
     <div className="space-y-2">
       <div className="flex items-end gap-2 rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-500/10 dark:border-zinc-800 dark:bg-zinc-900">
@@ -379,6 +482,26 @@ function Composer({
           placeholder="Describe the situation, what you did, and the result."
           className="max-h-48 min-h-12 flex-1 resize-none bg-transparent px-2 py-1.5 text-[15px] leading-relaxed outline-none field-sizing-content placeholder:text-zinc-400 disabled:opacity-50 dark:placeholder:text-zinc-500"
         />
+        {onTranscript && (
+          <button
+            aria-label={recorder.state === "recording" ? "Stop recording" : "Start recording"}
+            onClick={recorder.state === "recording" ? recorder.stop : recorder.start}
+            disabled={busy || recorder.state === "transcribing"}
+            className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 ${
+              recorder.state === "recording"
+                ? "bg-red-600 text-white hover:bg-red-500"
+                : "border border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            }`}
+          >
+            {recorder.state === "recording" ? (
+              <Square className="h-3.5 w-3.5 fill-current" />
+            ) : recorder.state === "transcribing" ? (
+              <Loader2 className="h-4 w-4 motion-safe:animate-spin" />
+            ) : (
+              <Mic className="h-4 w-4" />
+            )}
+          </button>
+        )}
         {/* Enabled even when empty: an empty Answer is still an Answer (spec). */}
         <button
           aria-label="Send answer"
@@ -389,7 +512,7 @@ function Composer({
           <ArrowUp className="h-4 w-4" />
         </button>
       </div>
-      <p className="px-2 text-xs text-zinc-400">{busy ? `${personaName} is reading your answer.` : "Ctrl+Enter to send"}</p>
+      <p className={`px-2 text-xs ${recorder.error && !busy && recorder.state === "idle" ? "text-red-600 dark:text-red-400" : "text-zinc-400"}`}>{hint}</p>
     </div>
   );
 }
@@ -423,4 +546,86 @@ function JudgingFooter({
       )}
     </div>
   );
+}
+
+const MAX_RECORDING_SECONDS = 5 * 60;
+
+function formatSeconds(total: number): string {
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+// Voice Interview: record an Answer in the browser, then have the backend transcribe it.
+// The text goes into the Answer box for the candidate to check; nothing is sent automatically.
+function useRecorder(onTranscript: (text: string) => void) {
+  const [state, setState] = useState<"idle" | "recording" | "transcribing">("idle");
+  const [seconds, setSeconds] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+
+  async function start() {
+    setError(null);
+    let stream: MediaStream;
+    try {
+      // The browser asks for microphone permission the first time. http://localhost counts as a
+      // secure origin, so this works without HTTPS.
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setError("No microphone access. Allow it in the browser, or type your answer.");
+      return;
+    }
+    // Chrome and Firefox record webm, older Safari only mp4: use the first one this browser supports.
+    const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((t) => MediaRecorder.isTypeSupported(t));
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (e) => chunks.push(e.data);
+    // Runs after stop(): release the mic, then send the recording for transcription.
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop()); // also turns off the browser's recording indicator
+      recorderRef.current = null;
+      setState("transcribing");
+      try {
+        const { text } = await api.transcribe(new Blob(chunks, { type: recorder.mimeType }));
+        if (text) onTranscript(text);
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : "Could not transcribe the recording. Record again or type.");
+      } finally {
+        setState("idle");
+      }
+    };
+    recorder.start();
+    recorderRef.current = recorder;
+    setSeconds(0);
+    setState("recording");
+  }
+
+  function stop() {
+    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+  }
+
+  // Count the seconds while recording, and stop by itself at the limit.
+  useEffect(() => {
+    if (state !== "recording") return;
+    let elapsed = 0;
+    const timer = setInterval(() => {
+      elapsed += 1;
+      setSeconds(elapsed);
+      if (elapsed >= MAX_RECORDING_SECONDS && recorderRef.current?.state === "recording") recorderRef.current.stop();
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [state]);
+
+  // Leaving the page mid-recording: drop the recording and release the mic.
+  useEffect(
+    () => () => {
+      const recorder = recorderRef.current;
+      if (recorder?.state === "recording") {
+        recorder.onstop = null;
+        recorder.stop();
+        recorder.stream.getTracks().forEach((t) => t.stop());
+      }
+    },
+    [],
+  );
+
+  return { state, seconds, error, start, stop };
 }

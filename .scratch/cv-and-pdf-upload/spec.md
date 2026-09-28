@@ -1,6 +1,6 @@
 # CV and PDF upload: spec
 
-Status: ready-for-agent
+Status: resolved
 Confirmed by the user on 2026-09-28 after a grilling session. Build order: this feature first, then `judge-choice`, then `voice-interview`. Vocabulary in `CONTEXT.md` (CV, Job Description, Difficulty). Extends `.scratch/interview-practice/spec.md`.
 
 ## Purpose

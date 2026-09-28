@@ -3,6 +3,7 @@
 
 export type Seniority = "junior" | "mid" | "senior";
 export type Difficulty = "easy" | "normal" | "hard";
+export type Judge = "llm" | "jev";
 export type InterviewStatus = "in_progress" | "judging" | "completed" | "evaluation_missing";
 export type MessageRole = "question" | "answer" | "closing";
 export type Verdict = "strong_hire" | "hire" | "no_hire";
@@ -21,8 +22,11 @@ export interface Interview {
   seniority: Seniority;
   job_description: string | null;
   difficulty: Difficulty;
+  judge: Judge;
   persona_name: string;
   persona_title: string;
+  persona_voice: string;
+  voice_interview: boolean;
   status: InterviewStatus;
   ended_early: boolean;
   created_at: string;
@@ -37,6 +41,9 @@ export interface InterviewCreate {
   seniority: Seniority;
   job_description?: string | null;
   difficulty: Difficulty;
+  cv?: string | null;
+  judge: Judge;
+  voice_interview: boolean;
 }
 
 export interface HistoryRow {
@@ -44,12 +51,14 @@ export interface HistoryRow {
   title: string;
   created_at: string;
   status: InterviewStatus;
+  judge: Judge;
   overall_score: number | null;
 }
 
 export interface StarRating {
   rating: number;
-  comment: string;
+  comment: string | null; // null from the JEV Judge
+  confidence?: number | null; // JEV Judge only, 0-1
 }
 
 export interface StarBreakdown {
@@ -62,11 +71,15 @@ export interface StarBreakdown {
 
 export interface Evaluation {
   interview_id: number;
+  judge: Judge;
   overall_score: number;
-  justification: string;
+  justification: string | null; // null from the JEV Judge
   verdict: Verdict;
   improvement_points: string[];
   star_breakdowns: StarBreakdown[];
+  overall_confidence: number | null;
+  verdict_confidence: number | null;
+  checklist: { check: string; probability: number }[] | null;
   created_at: string;
 }
 
@@ -94,7 +107,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     response = await fetch(`${API_URL}${path}`, {
       ...init,
-      headers: { "Content-Type": "application/json", ...(init.headers ?? {}) },
+      // A file upload (FormData) must not get a JSON Content-Type: the browser sets its own.
+      headers: init.body instanceof FormData ? init.headers : { "Content-Type": "application/json", ...(init.headers ?? {}) },
     });
   } catch {
     throw new ApiError(0, "Cannot reach the backend. Is it running?");
@@ -113,6 +127,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
+/** mp3 of an interviewer message in the Persona's voice; used directly as an <audio> source. */
+export const speechUrl = (interviewId: number, messageId: number) =>
+  `${API_URL}/interviews/${interviewId}/messages/${messageId}/speech`;
+
 const json = (body: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(body) });
 
 export const api = {
@@ -121,6 +139,20 @@ export const api = {
   recommendSettings: (job_description: string) =>
     request<RecommendedSettings>("/recommend-settings", json({ job_description })),
 
+  latestCv: () => request<{ cv: string | null }>("/cv/latest"),
+  extractText: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<{ text: string }>("/extract-text", { method: "POST", body: form });
+  },
+
+  // A recorded Answer as text. The backend reads the format from the Blob's type (e.g. audio/webm).
+  transcribe: (audio: Blob) => {
+    const form = new FormData();
+    form.append("file", audio, "answer");
+    return request<{ text: string }>("/transcriptions", { method: "POST", body: form });
+  },
+
   createInterview: (body: InterviewCreate) => request<Interview>("/interviews", json(body)),
   getInterview: (id: number) => request<Interview>(`/interviews/${id}`),
   submitAnswer: (id: number, text: string) =>
@@ -128,6 +160,9 @@ export const api = {
   endInterview: (id: number) => request<Interview>(`/interviews/${id}/end`, { method: "POST" }),
 
   getEvaluation: (id: number) => request<Evaluation>(`/interviews/${id}/evaluation`),
+  listEvaluations: (id: number) => request<Evaluation[]>(`/interviews/${id}/evaluations`),
+  runJudge: (id: number, judge: Judge) =>
+    request<Evaluation>(`/interviews/${id}/evaluations/${judge}`, { method: "POST" }),
   rerunEvaluation: (id: number) =>
     request<Interview>(`/interviews/${id}/evaluation/rerun`, { method: "POST" }),
 

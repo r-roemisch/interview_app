@@ -1,6 +1,6 @@
 # Voice Interview: spec
 
-Status: ready-for-agent
+Status: resolved
 Confirmed by the user on 2026-09-28 after a grilling session. Build order: last, after `cv-and-pdf-upload` and `judge-choice`. Vocabulary in `CONTEXT.md` (Voice Interview, Answer, Persona). Decision record: ADR-0004. Extends `.scratch/interview-practice/spec.md`.
 
 ## Purpose
@@ -13,14 +13,14 @@ Rehearse out loud. The interviewer speaks its Questions and the Closing, the can
 
 ## Persona voice
 
-- Every Persona gets one voice from a fixed list of about 6 `gpt-4o-mini-tts` voices, each with a one-line description so the voice can fit the Persona's name.
+- Every Persona gets one voice from a fixed list of 6 Gemini TTS voices, each with a one-line description so the voice can fit the Persona's name.
 - The Persona call returns the voice together with name and title (an enum in its JSON schema). The fallback Persona "Alex Morgan, Hiring Manager" has a fixed voice. An unknown voice in the reply counts as a failed Persona call (fallback).
 - Stored for every Interview (harmless for written ones). "Practice again" gets a fresh Persona and voice, as today.
 - The voice decides who is speaking, never how: no tone instructions from Difficulty go to TTS.
 
 ## The interviewer speaks
 
-- Text-to-speech through OpenRouter, model `openai/gpt-4o-mini-tts`, mp3 output, the Persona's voice.
+- Text-to-speech through OpenRouter, model `google/gemini-3.8-flash-tts`, mp3 output, the Persona's voice. (OpenAI's TTS models are not on OpenRouter; the user chose Gemini 3.8 Flash TTS on 2026-09-29.)
 - Each new Question and the Closing play automatically when they arrive. Every interviewer message has a replay button.
 - The Question text is always shown, as in a written Interview.
 - A "Mute interviewer" toggle on the Interview page stops automatic playback. It is not stored; a page reload unmutes.
@@ -59,7 +59,7 @@ Rehearse out loud. The interviewer speaks its Questions and the Closing, the can
 
 ## Config
 
-- `STT_MODEL`, default `openai/gpt-4o-mini-transcribe`. `TTS_MODEL`, default `openai/gpt-4o-mini-tts`.
+- `STT_MODEL`, default `openai/gpt-4o-mini-transcribe`. `TTS_MODEL`, default `google/gemini-3.8-flash-tts`.
 - `LLM_PROVIDER=fake` also fakes both: TTS returns a short silent mp3, STT returns a fixed sentence.
 - README: the user must add both model ids to the OpenRouter allow-list. The blocked-model error message from `judge-choice` covers these models too.
 

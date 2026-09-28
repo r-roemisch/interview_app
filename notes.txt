@@ -9,3 +9,6 @@
 
 integrating jev as llm-as-a-judge
 creating a picture of the interviewer
+
+
+continue the lessons

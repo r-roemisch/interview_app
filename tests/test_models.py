@@ -24,13 +24,13 @@ def test_interview_with_messages_and_evaluation_round_trips(db):
         Message(role=MessageRole.CLOSING, text="Thanks, that's all.", position=2),
     ]
     interview.status = InterviewStatus.COMPLETED
-    interview.evaluation = Evaluation(
+    interview.evaluations = [Evaluation(
         overall_score=72,
         justification="Solid but thin on results.",
         verdict=Verdict.HIRE,
         improvement_points=["Quantify outcomes", "Name your own role", "Shorter setup"],
         star_breakdowns=[_breakdown(1)],
-    )
+    )]
     db.add(interview)
     db.commit()
     db.expunge_all()
@@ -76,9 +76,9 @@ def test_defaults_are_mid_normal_in_progress(db):
 def test_deleting_interview_cascades(db):
     interview = Interview(title="PM")
     interview.messages = [Message(role=MessageRole.QUESTION, text="Q", position=0)]
-    interview.evaluation = Evaluation(
+    interview.evaluations = [Evaluation(
         overall_score=10, justification="x", verdict=Verdict.NO_HIRE, improvement_points=[], star_breakdowns=[]
-    )
+    )]
     db.add(interview)
     db.commit()
 

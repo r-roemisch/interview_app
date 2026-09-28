@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
 
 import openai
 
@@ -16,6 +16,9 @@ from interview_app.config import get_settings
 log = logging.getLogger(__name__)
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+GUARDRAILS_URL = "https://openrouter.ai/workspaces/default/guardrails"
+
+T = TypeVar("T")
 
 Message = dict[str, str]  # {"role": "system" | "user" | "assistant", "content": str}
 
@@ -53,10 +56,14 @@ _RETRYABLE = (
 )
 
 
-def _status_error_message(exc: openai.APIStatusError) -> str:
-    body = exc.body if isinstance(exc.body, dict) else {}
+def rejection_message(body: Any, model: str, fallback: str) -> str:
+    """The provider's error message, or a short one naming the model when the allow-list blocks it."""
+    body = body if isinstance(body, dict) else {}
     err = body.get("error") if isinstance(body.get("error"), dict) else {}
-    return err.get("message") or str(exc)
+    message = err.get("message") or fallback
+    if "guardrail" in message:
+        return f"{model} is not on your OpenRouter allow-list. Add it at {GUARDRAILS_URL}"
+    return message
 
 
 class OpenRouterClient:
@@ -91,29 +98,37 @@ class OpenRouterClient:
                 "json_schema": {"name": "output", "strict": False, "schema": json_schema},
             }
 
-        attempts = self.max_retries + 1
-        for attempt in range(1, attempts + 1):
-            try:
-                response = self._client.chat.completions.create(**kwargs)
-            except _RETRYABLE as exc:
-                if attempt == attempts:
-                    log.error("LLM unavailable after %d attempts: %s", attempts, exc)
-                    raise LLMUnavailable(str(exc)) from exc
-                log.warning("LLM attempt %d/%d failed (%s), retrying", attempt, attempts, type(exc).__name__)
-                self._sleep(self.backoff_seconds * attempt)
-                continue
-            except openai.APIStatusError as exc:
-                # Bad key, blocked model, bad request: retrying will not help, but the caller
-                # still gets one exception type to handle.
-                log.error("LLM request rejected (%s): %s", type(exc).__name__, exc)
-                raise LLMUnavailable(_status_error_message(exc)) from exc
+        response = call_with_retries(
+            lambda: self._client.chat.completions.create(**kwargs),
+            model=self.model,
+            max_retries=self.max_retries,
+            backoff_seconds=self.backoff_seconds,
+            sleep=self._sleep,
+        )
+        content = response.choices[0].message.content
+        if not content:
+            raise LLMUnavailable("model returned an empty message")
+        return content
 
-            content = response.choices[0].message.content
-            if not content:
-                raise LLMUnavailable("model returned an empty message")
-            return content
 
-        raise AssertionError("unreachable")
+def call_with_retries(fn: Callable[[], T], *, model: str, max_retries: int, backoff_seconds: float, sleep) -> T:
+    """The one retry policy for OpenRouter calls made with the openai SDK (chat, speech)."""
+    attempts = max_retries + 1
+    for attempt in range(1, attempts + 1):
+        try:
+            return fn()
+        except _RETRYABLE as exc:
+            if attempt == attempts:
+                log.error("%s unavailable after %d attempts: %s", model, attempts, exc)
+                raise LLMUnavailable(str(exc)) from exc
+            log.warning("%s attempt %d/%d failed (%s), retrying", model, attempt, attempts, type(exc).__name__)
+            sleep(backoff_seconds * attempt)
+        except openai.APIStatusError as exc:
+            # Bad key, blocked model, bad request: retrying will not help, but the caller
+            # still gets one exception type to handle.
+            log.error("%s request rejected (%s): %s", model, type(exc).__name__, exc)
+            raise LLMUnavailable(rejection_message(exc.body, model, str(exc))) from exc
+    raise AssertionError("unreachable")
 
 
 @dataclass
@@ -175,7 +190,7 @@ class DevFakeLLMClient:
                 }
             )
         if "invent the interviewer" in system:
-            return json.dumps({"name": "Sam Taylor", "title": "Engineering Manager"})
+            return json.dumps({"name": "Sam Taylor", "title": "Engineering Manager", "voice": "Orus"})
         if "extract structured fields" in system:
             return json.dumps({"title": "Software Engineer", "industry": "Software", "seniority": "mid"})
         if "closing message" in last:

@@ -17,6 +17,12 @@ The vocabulary used in the code and docs is defined in [`CONTEXT.md`](./CONTEXT.
 
 Interviewer personas and pictures, voice input, streaming replies, technical interviews, timed answers, a curated question bank, PDF export, other languages, multiple users and deployment.
 
+
+I started the interview practice app with the goal in mind to make it as soon as possible production ready. I am not a fan of streamlit and decided for a proper frontend stack. 
+
+Another goal is to create as many features as possible to get a feel what is helpful, what is not helpful and what might be extra. I will write down every feature and how it worked and if it stays or is going to be removed
+
+
 <!-- OWNER SECTION END -->
 
 <!-- AGENT SECTION START: maintained by Claude and kept in sync with the code. -->
@@ -25,11 +31,15 @@ Interviewer personas and pictures, voice input, streaming replies, technical int
 
 | Part | Technology |
 |---|---|
-| Backend | Python 3.12, FastAPI, SQLAlchemy 2, SQLite, OpenAI SDK pointed at OpenRouter |
+| Backend | Python 3.12, FastAPI, SQLAlchemy 2, SQLite, OpenAI SDK pointed at OpenRouter, pypdf for PDF uploads |
 | Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind v4 |
 | Tests | pytest with a scripted fake LLM (no network, no key) |
 
 The frontend is a thin client. Every page is a client component and all logic, including LLM calls, lives in the FastAPI backend (see ADR-0001).
+
+Each Interview is scored by the Judge chosen on Setup: the LLM Judge, which writes feedback, or the JEV Judge, which only rates and gives its confidence (ADR-0003). The Evaluation page can run the other Judge on the same transcript and show both side by side.
+
+A Voice Interview (chosen on Setup) reads every Question and the Closing aloud in the Persona's voice (`TTS_MODEL`) and adds a mic button to the Answer box: the recording is transcribed (`STT_MODEL`) into the box, where you edit it and send it like a typed Answer. No audio is stored (ADR-0004). The mic works on http://localhost without HTTPS.
 
 ## Prerequisites
 
@@ -74,6 +84,9 @@ Backend, in `.env` at the repo root:
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `JEV_MODEL` | `typesafe/jev-1.13` | OpenRouter id of JEV, used by the JEV Judge. Keep it pinned: JEV's confidence values only mean something for one version |
+| `STT_MODEL` | `openai/gpt-4o-mini-transcribe` | Transcribes spoken Answers in a Voice Interview. Must be on your OpenRouter allow-list |
+| `TTS_MODEL` | `google/gemini-3.8-flash-tts` | The interviewer's voice in a Voice Interview. Must be on your allow-list. The Persona voices in `models.py` are this model's voices |
 | `LLM_PROVIDER` | `openrouter` | `openrouter` for real calls, `fake` for an offline scripted interviewer and judge |
 | `OPENROUTER_API_KEY` | empty | Required when `LLM_PROVIDER=openrouter` |
 | `LLM_MODEL` | `google/gemma-4-31b-it:free` | Any OpenRouter model id. Free ones are listed at https://openrouter.ai/models?q=free |
@@ -88,7 +101,7 @@ Frontend, in `frontend/.env.local`:
 
 ### After a change to the tables
 
-There are no migrations: at startup the backend creates missing tables but never adds columns to existing ones. When a change adds columns (the Persona did), delete `interview.db` and restart the backend. This also deletes your History.
+There are no migrations: at startup the backend creates missing tables but never adds columns to existing ones. When a change adds columns (the Persona, the CV, the Judge choice and Voice Interviews did), delete `interview.db` and restart the backend. This also deletes your History.
 
 ### "Model blocked by guardrail"
 
@@ -101,7 +114,7 @@ Both are configured at https://openrouter.ai/workspaces/default/guardrails. Free
 
 ### Developing without a key
 
-Set `LLM_PROVIDER=fake`. The backend then uses a fixed Persona (Sam Taylor, Engineering Manager), asks ten fixed behavioral questions, writes a closing message and returns a fixed evaluation. Everything else, including history, resume, re-run and delete, behaves exactly as with a real model.
+Set `LLM_PROVIDER=fake`. The backend then uses a fixed Persona (Sam Taylor, Engineering Manager), asks ten fixed behavioral questions, writes a closing message and returns a fixed evaluation. The JEV Judge is faked too, with plausible scores, and so is speech: silent audio and a fixed transcription. Everything else, including history, resume, re-run and delete, behaves exactly as with a real model.
 
 ## Tests
 
@@ -126,8 +139,10 @@ src/interview_app/
   models.py         Interview, Message, Evaluation
   schemas.py        API response shapes
   llm.py            OpenRouter client, retries, fake clients
-  prompts/          interviewer, Persona, judge, recommended-settings prompts
-  services/         interview flow, judge, recommendation
+  jev.py            JEV client (plain HTTP to OpenRouter's /systemone), fake clients
+  speech.py         text-to-speech and transcription for Voice Interviews, fake clients
+  prompts/          interviewer, Persona, LLM Judge, JEV Judge + Checklist, recommended-settings prompts
+  services/         interview flow, LLM Judge, JEV Judge, recommendation, PDF text extraction
   routers/          HTTP endpoints
 tests/              pytest suite
 frontend/

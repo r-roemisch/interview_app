@@ -15,6 +15,7 @@ from interview_app.models import (
     Difficulty,
     Interview,
     InterviewStatus,
+    Judge,
     Message,
     MessageRole,
     Seniority,
@@ -58,6 +59,9 @@ def start_interview(
     seniority: Seniority,
     job_description: str | None,
     difficulty: Difficulty,
+    cv: str | None = None,
+    judge: Judge = Judge.LLM,
+    voice_interview: bool = False,
 ) -> Interview:
     interview = Interview(
         title=title.strip(),
@@ -65,9 +69,12 @@ def start_interview(
         seniority=seniority,
         job_description=job_description.strip() if job_description else None,
         difficulty=difficulty,
+        cv=(cv or "").strip() or None,
+        judge=judge,
+        voice_interview=voice_interview,
     )
     persona = create_persona(llm, interview)
-    interview.persona_name, interview.persona_title = persona.name, persona.title
+    interview.persona_name, interview.persona_title, interview.persona_voice = persona.name, persona.title, persona.voice
     first_question = llm.complete(messages_for_next_question(interview))
     _append(interview, MessageRole.QUESTION, first_question.strip())
     db.add(interview)

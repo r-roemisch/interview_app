@@ -1,10 +1,18 @@
 "use client";
 
-import { History, RotateCcw, RotateCw, Scale } from "lucide-react";
+import { History, RotateCcw, RotateCw, Scale, Scale3d } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { api, ApiError, type Evaluation, type Interview, type Message, type StarBreakdown, type Verdict } from "@/lib/api";
-import { DIFFICULTY_OPTIONS, SENIORITY_OPTIONS, STAR_PARTS, VERDICT_LABEL } from "@/lib/labels";
+import { api, ApiError, type Evaluation, type Interview, type Judge, type Message, type StarBreakdown, type Verdict } from "@/lib/api";
+import {
+  confidenceLevel,
+  DIFFICULTY_OPTIONS,
+  JEV_EXPLANATION,
+  JUDGE_LABEL,
+  SENIORITY_OPTIONS,
+  STAR_PARTS,
+  VERDICT_LABEL,
+} from "@/lib/labels";
 import { Button, ErrorBanner, LinkButton, Page, PersonaAvatar, Spinner, StarLetter } from "../../../ui";
 
 const VERDICT_STYLE: Record<Verdict, string> = {
@@ -22,6 +30,8 @@ export default function EvaluationPage() {
 
   const [interview, setInterview] = useState<Interview | null>(null);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
+  // The other Judge's Evaluation, once it has been run for the comparison.
+  const [other, setOther] = useState<Evaluation | null>(null);
   const [state, setState] = useState<"loading" | "judging" | "missing" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -43,8 +53,10 @@ export default function EvaluationPage() {
       }
       try {
         const ev = await api.getEvaluation(interviewId);
+        const all = await api.listEvaluations(interviewId);
         if (cancelled) return;
         setEvaluation(ev);
+        setOther(all.find((e) => e.judge !== iv.judge) ?? null);
         setState("ready");
       } catch (e) {
         if (cancelled) return;
@@ -149,6 +161,12 @@ export default function EvaluationPage() {
           <>
             <ScoreCard evaluation={evaluation} />
 
+            {other ? (
+              <Comparison chosen={evaluation} other={other} />
+            ) : (
+              <RunOtherJudge interviewId={interviewId} judge={evaluation.judge === "llm" ? "jev" : "llm"} onDone={setOther} />
+            )}
+
             <section>
               <h2 className="mb-3 text-lg font-semibold">Improve next time</h2>
               <ul className="space-y-2">
@@ -192,25 +210,47 @@ export default function EvaluationPage() {
   );
 }
 
-// The Evaluation comes from the Judge, never from the Persona (ADR-0002).
+// The Evaluation comes from a Judge, never from the Persona (ADR-0002, ADR-0003).
 function ScoreCard({ evaluation }: { evaluation: Evaluation }) {
+  const isJev = evaluation.judge === "jev";
   return (
     <section className="grid gap-6 rounded-2xl border border-zinc-200 bg-zinc-50/60 p-6 sm:grid-cols-[auto_1fr] dark:border-zinc-800 dark:bg-zinc-900/40">
       <div className="flex items-center gap-4 sm:flex-col sm:items-start">
         <p className="leading-none">
           <span className="text-6xl font-semibold tracking-tight tabular-nums">{evaluation.overall_score}</span>
           <span className="ml-1 text-lg text-zinc-400">/100</span>
+          {evaluation.overall_confidence != null && <Confidence value={evaluation.overall_confidence} />}
         </p>
-        <span className={`rounded-full px-2.5 py-1 text-sm font-medium ring-1 ${VERDICT_STYLE[evaluation.verdict]}`}>
-          {VERDICT_LABEL[evaluation.verdict]}
+        <span className="flex items-center gap-1.5">
+          <span className={`rounded-full px-2.5 py-1 text-sm font-medium ring-1 ${VERDICT_STYLE[evaluation.verdict]}`}>
+            {VERDICT_LABEL[evaluation.verdict]}
+          </span>
+          {evaluation.verdict_confidence != null && <Confidence value={evaluation.verdict_confidence} />}
         </span>
       </div>
       <div>
         <p className="mb-2 flex items-center gap-1.5 text-sm font-medium text-zinc-500">
           <Scale className="h-4 w-4" />
-          Judge
+          {JUDGE_LABEL[evaluation.judge]} Judge
         </p>
-        <p className="text-[15px] leading-relaxed">{evaluation.justification}</p>
+        {isJev ? (
+          <>
+            <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+              <span className="font-medium text-zinc-900 dark:text-zinc-100">How the JEV Judge works. </span>
+              {JEV_EXPLANATION}
+            </p>
+            <p className="mt-3 flex flex-wrap gap-3 text-xs text-zinc-500">
+              {(["high", "medium", "low"] as const).map((level) => (
+                <span key={level} className="flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full ${CONFIDENCE_DOT[level]}`} />
+                  {level} confidence
+                </span>
+              ))}
+            </p>
+          </>
+        ) : (
+          <p className="text-[15px] leading-relaxed">{evaluation.justification}</p>
+        )}
       </div>
     </section>
   );
@@ -274,8 +314,9 @@ function StarRows({ breakdown }: { breakdown: StarBreakdown }) {
             <span className="flex items-center gap-2 pt-1">
               <span className="font-medium sm:hidden">{part.label}</span>
               <RatingBar rating={r.rating} label={part.label} />
+              {r.confidence != null && <Confidence value={r.confidence} />}
             </span>
-            <span className="col-start-2 text-zinc-600 sm:col-start-3 sm:pt-0.5 dark:text-zinc-400">{r.comment}</span>
+            {r.comment && <span className="col-start-2 text-zinc-600 sm:col-start-3 sm:pt-0.5 dark:text-zinc-400">{r.comment}</span>}
           </li>
         );
       })}
@@ -290,5 +331,99 @@ function RatingBar({ rating, label }: { rating: number; label: string }) {
         <span key={i} className={`h-1.5 w-4 rounded-full ${i < rating ? "bg-indigo-600 dark:bg-indigo-400" : "bg-zinc-200 dark:bg-zinc-700"}`} />
       ))}
     </span>
+  );
+}
+
+const CONFIDENCE_DOT = { high: "bg-emerald-500", medium: "bg-amber-400", low: "bg-red-500" };
+
+// A coloured dot for JEV's confidence in one decision; the legend is in the ScoreCard.
+function Confidence({ value }: { value: number }) {
+  const level = confidenceLevel(value);
+  return (
+    <span
+      role="img"
+      aria-label={`${level} confidence`}
+      title={`JEV confidence: ${level} (${value.toFixed(2)})`}
+      className={`ml-1.5 inline-block h-2 w-2 shrink-0 rounded-full align-middle ${CONFIDENCE_DOT[level]}`}
+    />
+  );
+}
+
+// Button that runs the Judge that was not chosen. It waits for the result (the LLM Judge can
+// take a while) and shows any error next to the button, which then works as a retry.
+function RunOtherJudge({ interviewId, judge, onDone }: { interviewId: number; judge: Judge; onDone: (e: Evaluation) => void }) {
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run() {
+    setRunning(true);
+    setError(null);
+    try {
+      onDone(await api.runJudge(interviewId, judge));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "The Judge could not run.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button variant="secondary" onClick={run} disabled={running}>
+        <Scale3d className="h-4 w-4" />
+        Run {JUDGE_LABEL[judge]} Judge to compare
+      </Button>
+      {running && <Spinner label={`The ${JUDGE_LABEL[judge]} Judge is scoring the same answers...`} />}
+      {error && <span className="text-sm text-red-600 dark:text-red-400">{error}</span>}
+    </div>
+  );
+}
+
+// Both Judges side by side on the same transcript: scores, verdicts, and STAR ratings per Answer.
+function Comparison({ chosen, other }: { chosen: Evaluation; other: Evaluation }) {
+  const cols = [chosen, other];
+  const stars = (b: StarBreakdown) => STAR_PARTS.map((p) => `${p.label[0]}${b[p.key].rating}`).join(" ");
+  return (
+    <section>
+      <h2 className="mb-3 text-lg font-semibold">Judges compared</h2>
+      <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+        <table className="w-full text-sm">
+          <thead className="bg-zinc-50 text-left text-zinc-500 dark:bg-zinc-900/60">
+            <tr>
+              <th className="px-4 py-2 font-medium" />
+              {cols.map((e, i) => (
+                <th key={e.judge} className="px-4 py-2 font-medium">
+                  {JUDGE_LABEL[e.judge]} Judge{i === 0 && " (chosen)"}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-100 tabular-nums dark:divide-zinc-800">
+            <tr>
+              <td className="px-4 py-2 text-zinc-500">Overall score</td>
+              {cols.map((e) => (
+                <td key={e.judge} className="px-4 py-2 text-base font-semibold">{e.overall_score}</td>
+              ))}
+            </tr>
+            <tr>
+              <td className="px-4 py-2 text-zinc-500">Verdict</td>
+              {cols.map((e) => (
+                <td key={e.judge} className="px-4 py-2">{VERDICT_LABEL[e.verdict]}</td>
+              ))}
+            </tr>
+            {chosen.star_breakdowns.map((b, i) => (
+              <tr key={b.position}>
+                <td className="px-4 py-2 text-zinc-500">Answer {i + 1}</td>
+                {cols.map((e) => (
+                  <td key={e.judge} className="px-4 py-2 font-mono text-xs">
+                    {e.star_breakdowns[i] ? stars(e.star_breakdowns[i]) : "-"}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }

@@ -4,7 +4,7 @@ import { Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, ApiError, type HistoryRow } from "@/lib/api";
-import { formatDate, STATUS_LABEL } from "@/lib/labels";
+import { formatDate, JUDGE_LABEL, STATUS_LABEL } from "@/lib/labels";
 import { ErrorBanner, LinkButton, Page, Spinner, StatusBadge } from "../ui";
 
 // History page: every past Interview. Each row opens the right page for its status.
@@ -83,7 +83,7 @@ export default function HistoryPage() {
                   {row.overall_score !== null && (
                     <span className="text-right">
                       <span className="block text-xl font-semibold tabular-nums">{row.overall_score}</span>
-                      <span className="block text-xs text-zinc-500">score</span>
+                      <span className="block text-xs text-zinc-500">{JUDGE_LABEL[row.judge]} score</span>
                     </span>
                   )}
                 </Link>

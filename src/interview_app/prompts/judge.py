@@ -44,7 +44,7 @@ def judge_json_schema() -> dict[str, Any]:
     return JudgeOutput.model_json_schema()
 
 
-def _job_block(interview: Interview) -> str:
+def job_block(interview: Interview) -> str:
     lines = [
         f"Title: {interview.title}",
         f"Seniority: {interview.seniority.value}",
@@ -55,7 +55,7 @@ def _job_block(interview: Interview) -> str:
     return "\n".join(lines)
 
 
-def _transcript_block(interview: Interview) -> str:
+def transcript_block(interview: Interview) -> str:
     lines = []
     answer_no = 0
     for m in interview.messages:
@@ -86,8 +86,8 @@ def messages_for_judge(interview: Interview, *, previous_error: str | None = Non
     )
     user = "\n\n".join(
         [
-            "POSITION\n" + _job_block(interview),
-            "TRANSCRIPT\n" + _transcript_block(interview),
+            "POSITION\n" + job_block(interview),
+            "TRANSCRIPT\n" + transcript_block(interview),
             f"Now evaluate. `answers` must have {answer_count} entries.",
         ]
     )

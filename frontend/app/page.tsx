@@ -1,13 +1,13 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
-import { useState } from "react";
+import { FileUp, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, ApiError, type Difficulty, type Seniority } from "@/lib/api";
-import { DIFFICULTY_OPTIONS, SENIORITY_OPTIONS } from "@/lib/labels";
+import { api, ApiError, type Difficulty, type Judge, type Seniority } from "@/lib/api";
+import { DIFFICULTY_OPTIONS, JEV_EXPLANATION, JUDGE_OPTIONS, MODE_OPTIONS, SENIORITY_OPTIONS } from "@/lib/labels";
 import { Button, ErrorBanner, Field, inputClass, Page, Spinner } from "./ui";
 
-// Setup page: describe the Job, pick Difficulty, start an Interview.
+// Setup page: describe the Job, pick Difficulty and Judge, start an Interview.
 export default function SetupPage() {
   const router = useRouter();
 
@@ -17,10 +17,21 @@ export default function SetupPage() {
   const [seniority, setSeniority] = useState<Seniority>("mid");
   const [jobDescription, setJobDescription] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("normal");
+  const [cv, setCv] = useState("");
+  const [judge, setJudge] = useState<Judge>("llm");
+  const [mode, setMode] = useState<"written" | "voice">("written");
 
   const [recommending, setRecommending] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Pre-fill the CV from the last Interview that had one. Runs once, after the first render.
+  useEffect(() => {
+    api
+      .latestCv()
+      .then((r) => setCv((current) => current || r.cv || ""))
+      .catch(() => {}); // no CV to pre-fill is fine
+  }, []);
 
   async function recommend() {
     setError(null);
@@ -49,6 +60,9 @@ export default function SetupPage() {
         seniority,
         job_description: jobDescription.trim() || null,
         difficulty,
+        cv: cv.trim() || null,
+        judge,
+        voice_interview: mode === "voice",
       });
       router.push(`/interviews/${interview.id}`);
     } catch (e) {
@@ -76,6 +90,7 @@ export default function SetupPage() {
               <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
               Recommend settings
             </Button>
+            <PdfUpload onText={setJobDescription} onError={setError} disabled={busy} />
             {recommending && <Spinner label="Reading the posting..." />}
           </div>
         </section>
@@ -116,32 +131,30 @@ export default function SetupPage() {
             </fieldset>
           </div>
 
-          <fieldset>
-            <legend className="mb-1.5 text-sm font-medium">Difficulty</legend>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {DIFFICULTY_OPTIONS.map((o) => (
-                <label
-                  key={o.value}
-                  className={`cursor-pointer rounded-xl border p-3.5 text-sm transition-colors has-focus-visible:outline-2 has-focus-visible:outline-indigo-500 ${
-                    difficulty === o.value
-                      ? "border-indigo-500 bg-indigo-50/60 ring-1 ring-indigo-500 dark:bg-indigo-500/10"
-                      : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="difficulty"
-                    value={o.value}
-                    checked={difficulty === o.value}
-                    onChange={() => setDifficulty(o.value)}
-                    className="sr-only"
-                  />
-                  <span className="font-medium">{o.label}</span>
-                  <span className="mt-1 block text-xs leading-relaxed text-zinc-500">{o.hint}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          <ChoiceCards legend="Interview" name="mode" options={MODE_OPTIONS} value={mode} onChange={setMode} />
+
+          <ChoiceCards legend="Difficulty" name="difficulty" options={DIFFICULTY_OPTIONS} value={difficulty} onChange={setDifficulty} />
+
+          <div>
+            <ChoiceCards legend="Judge" name="judge" options={JUDGE_OPTIONS} value={judge} onChange={setJudge} />
+            {judge === "jev" && (
+              <p className="mt-2 rounded-lg bg-zinc-50 p-3 text-xs leading-relaxed text-zinc-600 dark:bg-zinc-900/60 dark:text-zinc-400">
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">How the JEV Judge works. </span>
+                {JEV_EXPLANATION}
+              </p>
+            )}
+          </div>
+
+          <Field label="Your CV" hint="Optional. On Normal and Hard the interviewer asks about your experience. Only the interviewer reads it.">
+            <textarea
+              className={`${inputClass} min-h-28`}
+              value={cv}
+              onChange={(e) => setCv(e.target.value)}
+              maxLength={20000}
+              placeholder="Paste your CV here"
+            />
+          </Field>
+          <PdfUpload onText={setCv} onError={setError} disabled={busy} />
         </div>
 
         {error && <ErrorBanner message={error} />}
@@ -154,5 +167,84 @@ export default function SetupPage() {
         </div>
       </form>
     </Page>
+  );
+}
+
+// "Upload PDF" button: sends the file to the backend and hands back the extracted text.
+// The <label> wraps a hidden file input, so clicking the label opens the file picker.
+function PdfUpload({
+  onText,
+  onError,
+  disabled,
+}: {
+  onText: (text: string) => void;
+  onError: (message: string | null) => void;
+  disabled: boolean;
+}) {
+  const [uploading, setUploading] = useState(false);
+
+  async function upload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = ""; // lets the same file be picked again
+    if (!file) return;
+    onError(null);
+    setUploading(true);
+    try {
+      onText((await api.extractText(file)).text);
+    } catch (e) {
+      onError(e instanceof ApiError ? e.message : "Could not read the PDF.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <label
+      className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 has-focus-visible:outline-2 has-focus-visible:outline-indigo-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 ${
+        disabled || uploading ? "pointer-events-none opacity-50" : ""
+      }`}
+    >
+      <input type="file" accept="application/pdf,.pdf" onChange={upload} disabled={disabled || uploading} className="sr-only" />
+      <FileUp className="h-4 w-4" />
+      {uploading ? "Reading PDF..." : "Upload PDF"}
+    </label>
+  );
+}
+
+// A row of selectable cards (radio buttons in disguise), used for Difficulty and Judge.
+// Generic over T so each use keeps its own value type ("easy" | ... or "llm" | "jev").
+function ChoiceCards<T extends string>({
+  legend,
+  name,
+  options,
+  value,
+  onChange,
+}: {
+  legend: string;
+  name: string;
+  options: { value: T; label: string; hint: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="mb-1.5 text-sm font-medium">{legend}</legend>
+      <div className={`grid gap-2 ${options.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+        {options.map((o) => (
+          <label
+            key={o.value}
+            className={`cursor-pointer rounded-xl border p-3.5 text-sm transition-colors has-focus-visible:outline-2 has-focus-visible:outline-indigo-500 ${
+              value === o.value
+                ? "border-indigo-500 bg-indigo-50/60 ring-1 ring-indigo-500 dark:bg-indigo-500/10"
+                : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700"
+            }`}
+          >
+            <input type="radio" name={name} value={o.value} checked={value === o.value} onChange={() => onChange(o.value)} className="sr-only" />
+            <span className="font-medium">{o.label}</span>
+            <span className="mt-1 block text-xs leading-relaxed text-zinc-500">{o.hint}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
