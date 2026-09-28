@@ -27,6 +27,8 @@ class InterviewOut(BaseModel):
     seniority: Seniority
     job_description: str | None
     difficulty: Difficulty
+    persona_name: str
+    persona_title: str
     status: InterviewStatus
     ended_early: bool
     created_at: datetime

@@ -1,18 +1,28 @@
 # Interview Practice: spec
 
 Status: ready-for-agent
-Confirmed by the user on 2026-09-25 after a grilling session. Vocabulary is defined in `CONTEXT.md`; architecture decisions in `docs/adr/`.
+Confirmed by the user on 2026-09-25 after a grilling session; Persona and UI sections added after a second grilling session on 2026-09-28. Vocabulary is defined in `CONTEXT.md`; architecture decisions in `docs/adr/`.
+Extended on 2026-09-28 by `.scratch/cv-and-pdf-upload/spec.md`, `.scratch/judge-choice/spec.md` and `.scratch/voice-interview/spec.md`; where they differ, they win.
 
 ## Purpose
 
-A single-user, local, capstone-grade web app where a candidate rehearses a behavioral job interview with an LLM interviewer and receives a structured Evaluation. English only, text only, no accounts, no deployment.
+A single-user, local, capstone-grade web app where a candidate rehearses a behavioral job interview with an LLM interviewer and receives a structured Evaluation. English only, no accounts, no deployment. Written Interviews by default; Voice Interviews are specified in `voice-interview`.
 
 ## Setup
 
 - Job fields: title (required), industry (optional), Seniority (junior/mid/senior, defaults to mid), Job Description (optional free text pasted from a posting).
 - Recommended Settings: from a pasted Job Description, one LLM call suggests title, industry and seniority. User reviews and may override each. Never applied silently.
 - Difficulty: easy / normal / hard, default normal. Definitions in `CONTEXT.md`.
-- Persona and interviewer pictures: out of scope (see Later).
+- The user does not choose the Persona (see Persona).
+
+## Persona
+
+- Each Interview gets its own Persona: a name and job title (no company), invented by the LLM to fit the Job, e.g. "Priya Nair, Head of Customer Success".
+- Created in `start_interview` by a separate small LLM call returning JSON `{name, title}`, before the first Question. The first Question prompt receives it.
+- If that call fails after retries, fall back to "Alex Morgan, Hiring Manager" and continue. The first Question call keeps the normal retry-then-error behaviour.
+- The interviewer prompt knows the Persona's name and title only. Tone and strictness stay with Difficulty.
+- Stored on the Interview; not editable, no re-roll. "Practice again" gets a fresh Persona.
+- Shown as initials in a circle plus name and title on the Interview page and on Questions in the Evaluation transcript. The Evaluation itself is labelled Judge. History rows do not show it.
 
 ## Interview
 
@@ -40,6 +50,13 @@ A single-user, local, capstone-grade web app where a candidate rehearses a behav
 - Delete with confirmation.
 - "Practice again" on an Evaluation copies the Job snapshot and Difficulty into a new Interview.
 
+## UI
+
+- Polished SaaS look: neutral palette with one accent colour, soft borders, icons from `lucide-react` (the only UI dependency). Interview page is a full-height chat with the Answer box pinned to the bottom.
+- Layouts may change; flows and URLs stay as listed in Stack.
+- Light/dark follows the system setting, no toggle. Desktop first; mobile must stay usable.
+- The layout is chosen from throwaway prototypes of the Interview page (issue 14), then applied to all pages (issue 16).
+
 ## Stack
 
 - Backend at repo root: uv, Python 3.12, FastAPI, SQLAlchemy 2 + SQLite (`create_all` at startup, no migrations), Pydantic v2, `openai` SDK with `base_url` = OpenRouter. Default model `google/gemma-4-31b-it:free`, env-configurable, no automatic fallback.
@@ -65,10 +82,10 @@ A single-user, local, capstone-grade web app where a candidate rehearses a behav
 
 ## Data model
 
-- `interviews`: id, title, industry, seniority, job_description, difficulty, status (`in_progress` / `judging` / `completed` / `evaluation_missing`), created_at, ended_early (bool).
+- `interviews`: id, title, industry, seniority, job_description, difficulty, persona_name, persona_title, status (`in_progress` / `judging` / `completed` / `evaluation_missing`), created_at, ended_early (bool).
 - `messages`: id, interview_id, role (`question` / `answer` / `closing`), text, position.
 - `evaluations`: id, interview_id (unique), overall_score, justification, verdict, improvement_points (JSON), star_breakdowns (JSON: one per Answer with s/t/a/r ratings and comments), created_at.
 
 ## Later (explicitly out of scope)
 
-Persona + pre-made interviewer pictures, voice input, streaming, image generation, technical interviews, timers, curated question bank, PDF export, other languages, multi-user, deployment, "jev".
+Interviewer pictures (Persona uses initials only), Persona personalities, streaming, image generation, technical interviews, timers, curated question bank, PDF export, other languages, multi-user, deployment. (Voice input and the JEV Judge moved into their own specs.)

@@ -1,8 +1,25 @@
+<!-- OWNER SECTION START: written by the owner. Agents leave everything up to OWNER SECTION END unchanged. -->
 # Interview Practice
 
 A single-user web app for rehearsing behavioral job interviews. An LLM plays the interviewer, asks up to ten questions with follow-ups, and a separate LLM judge scores every answer against STAR (Situation, Task, Action, Result), gives an overall score, a hiring verdict and three improvement points.
 
 The vocabulary used in the code and docs is defined in [`CONTEXT.md`](./CONTEXT.md). Architecture decisions are in [`docs/adr/`](./docs/adr/).
+
+## How it works
+
+1. **Setup**: enter the job title, optional industry, seniority and job description, and pick a difficulty. Pasting a job description lets the app suggest title, industry and seniority.
+2. **Interview**: the interviewer greets you and asks the first question. Answer in text. Follow-ups count toward the cap of ten. You can end early after at least one answer.
+3. **Closing and judging**: after the last answer the interviewer writes a closing message and the judge starts in the background. When it finishes, "See evaluation" lights up.
+4. **Evaluation**: overall score, verdict and justification, then the transcript with a STAR breakdown under every answer, then three improvement points. "Practice this job again" starts a fresh interview with the same settings.
+5. **History**: all past interviews with status and score. In-progress ones can be resumed.
+
+## Not in this version
+
+Interviewer personas and pictures, voice input, streaming replies, technical interviews, timed answers, a curated question bank, PDF export, other languages, multiple users and deployment.
+
+<!-- OWNER SECTION END -->
+
+<!-- AGENT SECTION START: maintained by Claude and kept in sync with the code. -->
 
 ## Stack
 
@@ -69,21 +86,22 @@ Frontend, in `frontend/.env.local`:
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Where the browser finds the backend. Baked in at build time, so restart `npm run dev` after changing it |
 
-### Using free models on OpenRouter
+### After a change to the tables
 
-Free models may train on your prompts, and OpenRouter accounts block them by default. If every request fails with "Model blocked by guardrail", allow free endpoints in your OpenRouter privacy settings or edit the guardrail at https://openrouter.ai/workspaces/default/guardrails. Free models are also rate-limited. The app retries twice and then shows a Retry button.
+There are no migrations: at startup the backend creates missing tables but never adds columns to existing ones. When a change adds columns (the Persona did), delete `interview.db` and restart the backend. This also deletes your History.
+
+### "Model blocked by guardrail"
+
+If every request fails with this message, your OpenRouter workspace restricts which models a key may use. Two common causes:
+
+- **An allow-list guardrail** on the workspace. Only the listed models work, free or paid. Check which ones your key may use with `curl https://openrouter.ai/api/v1/models/user -H "Authorization: Bearer $OPENROUTER_API_KEY"` and set `LLM_MODEL` to one of them. `openai/gpt-4.1-mini` is a good, cheap choice that handles the judge's JSON well.
+- **The data policy** that blocks free models because they may train on prompts. Allow free endpoints in the privacy settings.
+
+Both are configured at https://openrouter.ai/workspaces/default/guardrails. Free models are also rate-limited; the app retries twice and then shows a Retry button.
 
 ### Developing without a key
 
-Set `LLM_PROVIDER=fake`. The backend then asks ten fixed behavioral questions, writes a closing message and returns a fixed evaluation. Everything else, including history, resume, re-run and delete, behaves exactly as with a real model.
-
-## How it works
-
-1. **Setup**: enter the job title, optional industry, seniority and job description, and pick a difficulty. Pasting a job description lets the app suggest title, industry and seniority.
-2. **Interview**: the interviewer greets you and asks the first question. Answer in text. Follow-ups count toward the cap of ten. You can end early after at least one answer.
-3. **Closing and judging**: after the last answer the interviewer writes a closing message and the judge starts in the background. When it finishes, "See evaluation" lights up.
-4. **Evaluation**: overall score, verdict and justification, then the transcript with a STAR breakdown under every answer, then three improvement points. "Practice this job again" starts a fresh interview with the same settings.
-5. **History**: all past interviews with status and score. In-progress ones can be resumed.
+Set `LLM_PROVIDER=fake`. The backend then uses a fixed Persona (Sam Taylor, Engineering Manager), asks ten fixed behavioral questions, writes a closing message and returns a fixed evaluation. Everything else, including history, resume, re-run and delete, behaves exactly as with a real model.
 
 ## Tests
 
@@ -108,7 +126,7 @@ src/interview_app/
   models.py         Interview, Message, Evaluation
   schemas.py        API response shapes
   llm.py            OpenRouter client, retries, fake clients
-  prompts/          interviewer, judge, recommended-settings prompts
+  prompts/          interviewer, Persona, judge, recommended-settings prompts
   services/         interview flow, judge, recommendation
   routers/          HTTP endpoints
 tests/              pytest suite
@@ -119,6 +137,4 @@ docs/adr/           architecture decisions
 .scratch/           spec and implementation issues
 ```
 
-## Not in this version
-
-Interviewer personas and pictures, voice input, streaming replies, technical interviews, timed answers, a curated question bank, PDF export, other languages, multiple users and deployment.
+<!-- AGENT SECTION END -->

@@ -83,9 +83,12 @@ class OpenRouterClient:
     def complete(self, messages: list[Message], *, json_schema: dict[str, Any] | None = None) -> str:
         kwargs: dict[str, Any] = {"model": self.model, "messages": messages}
         if json_schema is not None:
+            # strict=False: OpenAI's strict mode rejects schemas with optional fields or
+            # min/max constraints, which our Pydantic models have. The reply is validated
+            # with Pydantic anyway, so the schema is guidance for the model, not a guarantee.
             kwargs["response_format"] = {
                 "type": "json_schema",
-                "json_schema": {"name": "output", "strict": True, "schema": json_schema},
+                "json_schema": {"name": "output", "strict": False, "schema": json_schema},
             }
 
         attempts = self.max_retries + 1
@@ -171,6 +174,8 @@ class DevFakeLLMClient:
                     ],
                 }
             )
+        if "invent the interviewer" in system:
+            return json.dumps({"name": "Sam Taylor", "title": "Engineering Manager"})
         if "extract structured fields" in system:
             return json.dumps({"title": "Software Engineer", "industry": "Software", "seniority": "mid"})
         if "closing message" in last:

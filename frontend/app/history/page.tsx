@@ -1,14 +1,14 @@
 "use client";
 
+import { Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { api, ApiError, type HistoryRow } from "@/lib/api";
 import { formatDate, STATUS_LABEL } from "@/lib/labels";
-import { Button, ErrorBanner, LinkButton, Spinner, StatusBadge } from "../ui";
+import { ErrorBanner, LinkButton, Page, Spinner, StatusBadge } from "../ui";
 
-// History page: every past Interview. Row click opens the right page for its status.
+// History page: every past Interview. Each row opens the right page for its status.
 export default function HistoryPage() {
-  const router = useRouter();
   const [rows, setRows] = useState<HistoryRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Bumping this counter re-runs the loading effect (used by the Retry button).
@@ -32,12 +32,6 @@ export default function HistoryPage() {
     };
   }, [reloadKey]);
 
-  function open(row: HistoryRow) {
-    // In Progress resumes the chat; everything else goes to the Evaluation page,
-    // which shows "Re-run" for Evaluation Missing and polls while Judging.
-    router.push(row.status === "in_progress" ? `/interviews/${row.id}` : `/interviews/${row.id}/evaluation`);
-  }
-
   async function remove(row: HistoryRow) {
     if (!window.confirm(`Delete the interview for "${row.title}"? This cannot be undone.`)) return;
     try {
@@ -48,57 +42,63 @@ export default function HistoryPage() {
     }
   }
 
+  const newButton = (
+    <LinkButton href="/" variant="primary">
+      <Plus className="h-4 w-4" />
+      New interview
+    </LinkButton>
+  );
+
   return (
-    <div className="space-y-6">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">History</h1>
-        <LinkButton href="/">New interview</LinkButton>
-      </header>
+    <Page title="History" actions={rows && rows.length > 0 ? newButton : undefined}>
+      <div className="space-y-4">
+        {error && <ErrorBanner message={error} onRetry={reload} />}
+        {!rows && !error && <Spinner label="Loading..." />}
 
-      {error && <ErrorBanner message={error} onRetry={reload} />}
-      {!rows && !error && <Spinner label="Loading..." />}
-      {rows && rows.length === 0 && <p className="text-sm text-zinc-500">No interviews yet.</p>}
+        {rows && rows.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-zinc-300 px-6 py-12 text-center dark:border-zinc-700">
+            <p className="font-medium">No interviews yet</p>
+            <p className="mt-1 mb-5 text-sm text-zinc-500">Your finished and unfinished interviews will be listed here.</p>
+            {newButton}
+          </div>
+        )}
 
-      {rows && rows.length > 0 && (
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase text-zinc-500">
-            <tr>
-              <th className="py-2">Job</th>
-              <th className="py-2">Date</th>
-              <th className="py-2">Status</th>
-              <th className="py-2 text-right">Score</th>
-              <th className="py-2" />
-            </tr>
-          </thead>
-          <tbody>
+        {rows && rows.length > 0 && (
+          <ul className="divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
             {rows.map((row) => (
-              <tr
-                key={row.id}
-                className="cursor-pointer border-t border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-                onClick={() => open(row)}
-              >
-                <td className="py-3 font-medium">{row.title}</td>
-                <td className="py-3 text-zinc-500">{formatDate(row.created_at)}</td>
-                <td className="py-3">
-                  <StatusBadge status={row.status} label={STATUS_LABEL[row.status]} />
-                </td>
-                <td className="py-3 text-right tabular-nums">{row.overall_score ?? "–"}</td>
-                <td className="py-3 text-right">
-                  <Button
-                    variant="danger"
-                    onClick={(e) => {
-                      e.stopPropagation(); // don't also open the row
-                      void remove(row);
-                    }}
-                  >
-                    Delete
-                  </Button>
-                </td>
-              </tr>
+              <li key={row.id} className="flex items-center hover:bg-zinc-50 dark:hover:bg-zinc-900/60">
+                {/* In Progress resumes the chat; everything else goes to the Evaluation page,
+                    which shows "Re-run" for Evaluation Missing and polls while Judging. */}
+                <Link
+                  href={row.status === "in_progress" ? `/interviews/${row.id}` : `/interviews/${row.id}/evaluation`}
+                  className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3.5 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-indigo-500"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{row.title}</span>
+                    <span className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-zinc-500">
+                      {formatDate(row.created_at)}
+                      <StatusBadge status={row.status} label={STATUS_LABEL[row.status]} />
+                    </span>
+                  </span>
+                  {row.overall_score !== null && (
+                    <span className="text-right">
+                      <span className="block text-xl font-semibold tabular-nums">{row.overall_score}</span>
+                      <span className="block text-xs text-zinc-500">score</span>
+                    </span>
+                  )}
+                </Link>
+                <button
+                  onClick={() => void remove(row)}
+                  aria-label={`Delete the interview for ${row.title}`}
+                  className="mr-2 rounded-lg p-2 text-zinc-400 hover:bg-red-50 hover:text-red-600 focus-visible:outline-2 focus-visible:outline-red-500 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </li>
             ))}
-          </tbody>
-        </table>
-      )}
-    </div>
+          </ul>
+        )}
+      </div>
+    </Page>
   );
 }

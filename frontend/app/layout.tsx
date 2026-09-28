@@ -15,9 +15,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geist.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      {/* Full-height column: the top bar stays put and <main> scrolls, so the Interview page
+          can pin its Answer box to the bottom. Other pages centre themselves with <Page>. */}
+      <body className="flex h-dvh flex-col bg-background text-foreground">
         <Nav />
-        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       </body>
     </html>
   );

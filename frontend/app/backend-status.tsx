@@ -21,11 +21,13 @@ export function BackendStatus() {
   }, []);
 
   const color =
-    status === "online" ? "bg-green-500" : status === "offline" ? "bg-red-500" : "bg-zinc-400";
+    status === "online" ? "bg-emerald-500" : status === "offline" ? "bg-red-500" : "bg-zinc-400";
+  const label = { checking: "Checking backend", online: "Backend connected", offline: "Backend offline" }[status];
   return (
     <span className="flex items-center gap-2 text-xs text-zinc-500" title="FastAPI backend">
       <span className={`inline-block h-2 w-2 rounded-full ${color}`} />
-      backend {status}
+      {/* On a phone only the dot is shown; the label stays for screen readers. */}
+      <span className="sr-only sm:not-sr-only">{label}</span>
     </span>
   );
 }

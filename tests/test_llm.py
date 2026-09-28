@@ -83,6 +83,7 @@ def test_json_schema_is_passed_as_response_format(monkeypatch):
     assert client.complete([{"role": "user", "content": "x"}], json_schema=schema) == '{"a": 1}'
     assert seen["response_format"]["type"] == "json_schema"
     assert seen["response_format"]["json_schema"]["schema"] == schema
+    assert seen["response_format"]["json_schema"]["strict"] is False  # see comment in llm.py
     assert seen["model"] == "test/model"
 
 
@@ -123,5 +124,7 @@ def test_dev_fake_answers_each_prompt_kind():
     assert "Thank you" in closing
     judge = json.loads(fake.complete([{"role": "system", "content": "You are an experienced hiring manager"}, {"role": "user", "content": "CANDIDATE (answer 1): x\n\nCANDIDATE (answer 2): y"}]))
     assert len(judge["answers"]) == 2 and judge["verdict"] == "hire"
+    persona = json.loads(fake.complete([{"role": "system", "content": "You invent the interviewer"}, {"role": "user", "content": "Job: x"}]))
+    assert persona == {"name": "Sam Taylor", "title": "Engineering Manager"}
     rec = json.loads(fake.complete([{"role": "system", "content": "You extract structured fields"}, {"role": "user", "content": "jd"}]))
     assert rec["seniority"] == "mid"

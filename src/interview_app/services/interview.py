@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
+import logging
 from collections.abc import Callable
 
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from interview_app.llm import LLMClient
+from interview_app.llm import LLMClient, LLMUnavailable, strip_code_fence
 from interview_app.models import (
     QUESTION_CAP,
     Difficulty,
@@ -17,6 +20,9 @@ from interview_app.models import (
     Seniority,
 )
 from interview_app.prompts.interviewer import messages_for_closing, messages_for_next_question
+from interview_app.prompts.persona import DEFAULT_PERSONA, Persona, messages_for_persona, persona_schema
+
+log = logging.getLogger(__name__)
 
 
 class InterviewStateError(Exception):
@@ -31,6 +37,16 @@ def _append(interview: Interview, role: MessageRole, text: str) -> Message:
     msg = Message(role=role, text=text, position=len(interview.messages))
     interview.messages.append(msg)
     return msg
+
+
+def create_persona(llm: LLMClient, interview: Interview) -> Persona:
+    """One call, no retry on bad output. Any failure falls back to DEFAULT_PERSONA (spec: Persona)."""
+    try:
+        raw = llm.complete(messages_for_persona(interview), json_schema=persona_schema())
+        return Persona.model_validate(json.loads(strip_code_fence(raw)))
+    except (LLMUnavailable, json.JSONDecodeError, ValidationError) as exc:
+        log.warning("Persona call failed, using the default Persona: %s", exc)
+        return DEFAULT_PERSONA
 
 
 def start_interview(
@@ -50,6 +66,8 @@ def start_interview(
         job_description=job_description.strip() if job_description else None,
         difficulty=difficulty,
     )
+    persona = create_persona(llm, interview)
+    interview.persona_name, interview.persona_title = persona.name, persona.title
     first_question = llm.complete(messages_for_next_question(interview))
     _append(interview, MessageRole.QUESTION, first_question.strip())
     db.add(interview)

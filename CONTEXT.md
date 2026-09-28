@@ -11,8 +11,12 @@ The position the candidate is practicing for. Only the title is required; indust
 _Avoid_: Position, role, vacancy
 
 **Job Description**:
-Free text pasted from a real job posting. Optional; when present it is used to infer Recommended Settings and to ground questions.
+Free text from a real job posting, pasted or taken from an uploaded PDF. Optional; when present it is used to infer Recommended Settings and to ground questions. Only the text is kept, never the file.
 _Avoid_: Posting, JD
+
+**CV**:
+Free text describing the candidate's experience, pasted or taken from an uploaded PDF. Optional and attached to one Interview, like the Job. Read only by the interviewer, to ask about the candidate's real experiences; never by the Judge or Recommended Settings. Only the text is kept, never the file.
+_Avoid_: Resume, profile
 
 **Seniority**:
 The level of the Job (junior, mid, senior). Belongs to the Job, never to the candidate. Chosen by the user; a Recommended Setting may suggest it but never sets it silently.
@@ -23,7 +27,7 @@ Values for Job fields suggested by the app from a pasted Job Description. The us
 _Avoid_: Auto-fill, defaults
 
 **Difficulty**:
-How demanding the interviewer's questions and follow-ups are. Easy: common, direct questions, no follow-ups. Normal: standard questions, one follow-up when an Answer is vague. Hard: situational, probing questions with follow-ups that challenge specifics and expect metrics and trade-offs.
+How demanding the interviewer's questions and follow-ups are. Easy: common, direct questions, no follow-ups, the CV is ignored. Normal: standard questions, one follow-up when an Answer is vague, some Questions may draw on the CV. Hard: situational, probing questions with follow-ups that challenge specifics and expect metrics and trade-offs, including claims made in the CV.
 _Avoid_: Mode, level, rude
 
 ### Interview
@@ -48,12 +52,20 @@ _Avoid_: Finished, done, closed
 An Interview that no longer accepts Answers but whose Evaluation could not be produced. The user can re-run the Judge.
 _Avoid_: Failed, errored, pending
 
+**Persona**:
+The name and job title the interviewer presents as during one Interview, invented to fit the Job. It decides who is asking, never how: tone and strictness belong to Difficulty. The Persona speaks in Questions and the Closing, never in the Evaluation. In a Voice Interview the Persona has its own voice, which belongs to who is asking.
+_Avoid_: Character, avatar, interviewer profile
+
 **Question**:
 One message from the interviewer to the candidate. Follow-up questions are Questions too and count toward the cap.
 _Avoid_: Prompt, turn
 
+**Voice Interview**:
+An Interview in which the interviewer's Questions and Closing are spoken aloud and the candidate answers by speaking. Chosen at Setup as the alternative to a written Interview, which is the default. Everything that is stored and judged is still text; no audio is kept.
+_Avoid_: Audio mode, call
+
 **Answer**:
-The candidate's plain-text reply to one Question.
+The candidate's plain-text reply to one Question. In a Voice Interview, the transcription of what they said, as they confirmed or edited it before sending.
 _Avoid_: Response, message
 
 **Closing**:
@@ -63,19 +75,31 @@ _Avoid_: Goodbye, wrap-up, summary
 ### Outcome
 
 **Evaluation**:
-The judgment produced once, after the Interview ends: a STAR Breakdown per Answer, an Overall Score, and a Recommendation. Produced by the Judge, not the interviewer.
+The judgment produced after the Interview ends: a STAR Breakdown per Answer, an Overall Score, and a Recommendation. Produced by a Judge, not the interviewer. An Interview holds at most one Evaluation per Judge; the status and History follow the Evaluation of the Interview's chosen Judge.
 _Avoid_: Feedback, report, results
 
 **Overall Score**:
-A single 0-100 number the Judge assigns to the whole Interview, using the STAR Breakdowns and fit to the Job as evidence, with a one-paragraph justification. Comparable across Interviews in History.
+A single 0-100 number the Judge assigns to the whole Interview, using the STAR Breakdowns and fit to the Job as evidence. The LLM Judge adds a one-paragraph justification; the JEV Judge gives a confidence instead. Comparable across Interviews judged by the same Judge; History shows which Judge produced it.
 _Avoid_: Grade, total, rating
 
 **Judge**:
-The evaluator that scores the Interview. A separate prompt from the interviewer so the interviewer's style does not bias the score.
-_Avoid_: LLM-as-a-judge, grader, jev
+The evaluator that scores the Interview, separate from the interviewer so the interviewer's style does not bias the score. There are two: the LLM Judge and the JEV Judge. Each Interview has one chosen Judge, picked at Setup; the other may be run afterwards for comparison.
+_Avoid_: LLM-as-a-judge, grader
+
+**LLM Judge**:
+The Judge that writes its Evaluation: STAR ratings with comments, a justification for the Overall Score, and its own Improvement Points.
+_Avoid_: Normal judge, text judge
+
+**JEV Judge**:
+The Judge that only picks from fixed answers: STAR ratings, Overall Score and Verdict, each with a confidence, plus yes/no answers to the Checklist. It writes no text; its Improvement Points come from the Checklist.
+_Avoid_: Jev, quick judge
+
+**Checklist**:
+A fixed set of yes/no checks the JEV Judge answers about the whole Interview (for example "Results are quantified"). Each check has a pre-written Improvement Point used when the check fails.
+_Avoid_: Rubric, criteria
 
 **STAR Breakdown**:
-Assessment of one Answer against Situation, Task, Action and Result, each rated 1-5 with a one-line comment.
+Assessment of one Answer against Situation, Task, Action and Result, each rated 1-5. The LLM Judge adds a one-line comment per rating; the JEV Judge a confidence.
 _Avoid_: STAR score, rubric
 
 **Recommendation**:
@@ -87,7 +111,7 @@ The hiring decision a real interviewer would give: strong hire, hire, or no hire
 _Avoid_: Outcome, decision, result
 
 **Improvement Points**:
-A short list of specific things the candidate should do better next time.
+Exactly three specific things the candidate should do better next time. Written by the LLM Judge; taken from the weakest Checklist results by the JEV Judge.
 _Avoid_: Tips, suggestions
 
 ### History

@@ -1,10 +1,11 @@
 "use client";
 
+import { Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError, type Difficulty, type Seniority } from "@/lib/api";
 import { DIFFICULTY_OPTIONS, SENIORITY_OPTIONS } from "@/lib/labels";
-import { Button, ErrorBanner, Field, inputClass, Spinner } from "./ui";
+import { Button, ErrorBanner, Field, inputClass, Page, Spinner } from "./ui";
 
 // Setup page: describe the Job, pick Difficulty, start an Interview.
 export default function SetupPage() {
@@ -59,74 +60,99 @@ export default function SetupPage() {
   const busy = recommending || starting;
 
   return (
-    <form onSubmit={start} className="space-y-6">
-      <h1 className="text-2xl font-semibold">New interview</h1>
+    <Page title="New interview" intro="Describe the job you are practising for. Only the title is required.">
+      <form onSubmit={start} className="space-y-8">
+        <section className="space-y-3 rounded-2xl border border-zinc-200 bg-zinc-50/60 p-5 dark:border-zinc-800 dark:bg-zinc-900/40">
+          <Field label="Job description" hint="Optional. Paste a real posting and the app suggests the fields below.">
+            <textarea
+              className={`${inputClass} min-h-36`}
+              value={jobDescription}
+              onChange={(e) => setJobDescription(e.target.value)}
+              placeholder="Paste the job posting here"
+            />
+          </Field>
+          <div className="flex items-center gap-3">
+            <Button type="button" variant="secondary" onClick={recommend} disabled={busy || !jobDescription.trim()}>
+              <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              Recommend settings
+            </Button>
+            {recommending && <Spinner label="Reading the posting..." />}
+          </div>
+        </section>
 
-      <Field label="Job description" hint="Optional. Paste a real posting and let the app suggest the fields below.">
-        <textarea
-          className={`${inputClass} min-h-40`}
-          value={jobDescription}
-          onChange={(e) => setJobDescription(e.target.value)}
-          placeholder="Paste the job posting here..."
-        />
-      </Field>
-      <div className="flex items-center gap-3">
-        <Button type="button" variant="secondary" onClick={recommend} disabled={busy || !jobDescription.trim()}>
-          Recommend settings
-        </Button>
-        {recommending && <Spinner label="Reading the posting..." />}
-      </div>
+        <div className="space-y-5">
+          <Field label="Job title">
+            <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="e.g. Backend Engineer" />
+          </Field>
 
-      <Field label="Job title">
-        <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="e.g. Backend Engineer" />
-      </Field>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field label="Industry" hint="Optional">
+              <input className={inputClass} value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Fintech" />
+            </Field>
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-medium">Seniority of the role</legend>
+              <div className="grid grid-cols-3 gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-900">
+                {SENIORITY_OPTIONS.map((o) => (
+                  <label
+                    key={o.value}
+                    className={`cursor-pointer rounded-md px-3 py-1.5 text-center text-sm has-focus-visible:outline-2 has-focus-visible:outline-indigo-500 ${
+                      seniority === o.value
+                        ? "bg-white font-medium shadow-sm dark:bg-zinc-800"
+                        : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="seniority"
+                      value={o.value}
+                      checked={seniority === o.value}
+                      onChange={() => setSeniority(o.value)}
+                      className="sr-only"
+                    />
+                    {o.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Industry" hint="Optional">
-          <input className={inputClass} value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Fintech" />
-        </Field>
-        <Field label="Seniority of the role">
-          <select className={inputClass} value={seniority} onChange={(e) => setSeniority(e.target.value as Seniority)}>
-            {SENIORITY_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
-      <fieldset>
-        <legend className="mb-2 text-sm font-medium">Difficulty</legend>
-        <div className="grid gap-2 sm:grid-cols-3">
-          {DIFFICULTY_OPTIONS.map((o) => (
-            <label
-              key={o.value}
-              className={`cursor-pointer rounded-md border p-3 text-sm ${
-                difficulty === o.value ? "border-zinc-900 dark:border-zinc-100" : "border-zinc-300 dark:border-zinc-700"
-              }`}
-            >
-              <input
-                type="radio"
-                name="difficulty"
-                value={o.value}
-                checked={difficulty === o.value}
-                onChange={() => setDifficulty(o.value)}
-                className="mr-2"
-              />
-              <span className="font-medium">{o.label}</span>
-              <span className="mt-1 block text-xs text-zinc-500">{o.hint}</span>
-            </label>
-          ))}
+          <fieldset>
+            <legend className="mb-1.5 text-sm font-medium">Difficulty</legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {DIFFICULTY_OPTIONS.map((o) => (
+                <label
+                  key={o.value}
+                  className={`cursor-pointer rounded-xl border p-3.5 text-sm transition-colors has-focus-visible:outline-2 has-focus-visible:outline-indigo-500 ${
+                    difficulty === o.value
+                      ? "border-indigo-500 bg-indigo-50/60 ring-1 ring-indigo-500 dark:bg-indigo-500/10"
+                      : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="difficulty"
+                    value={o.value}
+                    checked={difficulty === o.value}
+                    onChange={() => setDifficulty(o.value)}
+                    className="sr-only"
+                  />
+                  <span className="font-medium">{o.label}</span>
+                  <span className="mt-1 block text-xs leading-relaxed text-zinc-500">{o.hint}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
         </div>
-      </fieldset>
 
-      {error && <ErrorBanner message={error} />}
+        {error && <ErrorBanner message={error} />}
 
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={busy || !title.trim()}>
-          Start interview
-        </Button>
-        {starting && <Spinner label="The interviewer is preparing the first question..." />}
-      </div>
-    </form>
+        <div className="flex items-center gap-3">
+          <Button type="submit" disabled={busy || !title.trim()} className="px-5">
+            Start interview
+          </Button>
+          {starting && <Spinner label="Preparing your interviewer and the first question..." />}
+        </div>
+      </form>
+    </Page>
   );
 }

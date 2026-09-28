@@ -2,6 +2,8 @@ import json
 
 from interview_app.models import Evaluation, Interview, Message
 
+PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering"})
+
 
 def _judge_reply(answers: int, score: int) -> str:
     r = {"rating": 3, "comment": "ok"}
@@ -17,7 +19,7 @@ def _judge_reply(answers: int, score: int) -> str:
 
 
 def _start(client, llm, title, **extra) -> int:
-    llm.responses.append(f"Hi. First question for {title}?")
+    llm.responses += [PERSONA, f"Hi. First question for {title}?"]
     r = client.post("/interviews", json={"title": title} | extra)
     assert r.status_code == 201, r.text
     return r.json()["id"]
@@ -74,7 +76,7 @@ def test_practice_again_copies_job_snapshot_and_difficulty(client, llm):
     )
     _complete(client, llm, iid, score=70)
 
-    llm.responses.append("Hi again. Q1?")
+    llm.responses += [PERSONA, "Hi again. Q1?"]
     r = client.post(f"/interviews/{iid}/practice-again")
     assert r.status_code == 201, r.text
     new = r.json()

@@ -12,6 +12,10 @@ from interview_app.db import Base
 
 QUESTION_CAP = 10
 
+# Fallback Persona when the Persona call fails (spec: Persona).
+DEFAULT_PERSONA_NAME = "Alex Morgan"
+DEFAULT_PERSONA_TITLE = "Hiring Manager"
+
 
 class Seniority(StrEnum):
     JUNIOR = "junior"
@@ -64,6 +68,9 @@ class Interview(Base):
     job_description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     difficulty: Mapped[Difficulty] = mapped_column(_enum(Difficulty), default=Difficulty.NORMAL)
+    # Persona: invented per Interview, never copied by Practice again.
+    persona_name: Mapped[str] = mapped_column(String(100), default=DEFAULT_PERSONA_NAME)
+    persona_title: Mapped[str] = mapped_column(String(200), default=DEFAULT_PERSONA_TITLE)
     status: Mapped[InterviewStatus] = mapped_column(_enum(InterviewStatus), default=InterviewStatus.IN_PROGRESS)
     ended_early: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

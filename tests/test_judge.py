@@ -3,6 +3,8 @@ import json
 from interview_app.llm import LLMUnavailable
 from interview_app.models import Evaluation, Interview
 
+PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering"})
+
 
 def _rating(n=4, c="ok"):
     return {"rating": n, "comment": c}
@@ -26,7 +28,7 @@ def _judge_json(answers: int, verdict="hire", score=70, points=None) -> str:
 
 def _finish_early(client, llm, answers=2) -> int:
     """Start an Interview, give `answers` Answers, end early. Caller scripts the Judge reply first."""
-    llm.responses.insert(0, "Hi. Q1?")
+    llm.responses[:0] = [PERSONA, "Hi. Q1?"]
     iid = client.post("/interviews", json={"title": "Data Analyst"}).json()["id"]
     # each Answer is followed by a scripted next Question
     for n in range(answers):
@@ -122,7 +124,7 @@ def test_rerun_on_completed_replaces_evaluation(client, llm, db):
 
 
 def test_evaluation_is_404_while_in_progress_and_rerun_is_409(client, llm):
-    llm.responses.append("Hi. Q1?")
+    llm.responses += [PERSONA, "Hi. Q1?"]
     iid = client.post("/interviews", json={"title": "PM"}).json()["id"]
     assert client.get(f"/interviews/{iid}/evaluation").status_code == 404
     assert client.post(f"/interviews/{iid}/evaluation/rerun").status_code == 409

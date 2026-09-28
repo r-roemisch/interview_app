@@ -1,13 +1,16 @@
 "use client";
 
+import { ArrowUp, ChevronDown, ClipboardCheck, Flag, RotateCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api, ApiError, type Interview, type Message } from "@/lib/api";
-import { Button, ErrorBanner, inputClass, Spinner } from "../../ui";
+import { DIFFICULTY_OPTIONS, SENIORITY_OPTIONS, STAR_PARTS } from "@/lib/labels";
+import { Button, ErrorBanner, Page, PersonaAvatar, Spinner, StarLetter } from "../../ui";
 
 type EvaluationState = "polling" | "ready" | "missing";
 
-// Interview page: the chat with the interviewer. Also handles resuming an in-progress Interview
+// Interview page: the chat with the interviewer, plus a side panel with the Persona, the Job,
+// the Question tracker and a STAR reminder. Also handles resuming an in-progress Interview
 // and the hand-off to the Evaluation after the Closing.
 export default function InterviewPage() {
   const { id } = useParams<{ id: string }>();
@@ -17,10 +20,14 @@ export default function InterviewPage() {
   const [interview, setInterview] = useState<Interview | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
-  // Polling starts as soon as the Interview has ended (see the effect below).
+  // The Answer being sent. Shown in the transcript until the reply arrives; on failure it
+  // goes back into the Answer box, so nothing typed is lost.
+  const [pending, setPending] = useState<string | null>(null);
+  const [ending, setEnding] = useState(false);
+  // What failed last, so Retry repeats the right action.
+  const [failed, setFailed] = useState<{ message: string; action?: "send" | "end" } | null>(null);
   const [evaluation, setEvaluation] = useState<EvaluationState>("polling");
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   // Bumping this counter re-runs the loading effect (used by the Retry button).
   const [reloadKey, setReloadKey] = useState(0);
@@ -46,10 +53,11 @@ export default function InterviewPage() {
     };
   }, [interviewId, reloadKey]);
 
-  // Once the Interview has ended, poll for the Evaluation every 2 s until it exists or the Judge failed.
+  // Once the Interview has ended, poll for the Evaluation every 2 s until it exists or the Judge
+  // failed. `evaluation` is a dependency so that "Re-run evaluation" starts polling again.
   const ended = interview !== null && interview.status !== "in_progress";
   useEffect(() => {
-    if (!ended) return;
+    if (!ended || evaluation !== "polling") return;
     let cancelled = false;
     const check = async () => {
       try {
@@ -57,8 +65,7 @@ export default function InterviewPage() {
         if (!cancelled) setEvaluation("ready");
       } catch (e) {
         if (cancelled) return;
-        if (e instanceof ApiError && e.status === 409) setEvaluation("missing");
-        else if (e instanceof ApiError && e.status === 404) timer = setTimeout(check, 2000);
+        if (e instanceof ApiError && e.status === 404) timer = setTimeout(check, 2000);
         else setEvaluation("missing");
       }
     };
@@ -67,131 +74,353 @@ export default function InterviewPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [ended, interviewId]);
+  }, [ended, evaluation, interviewId]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [interview?.messages.length]);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [interview?.messages.length, pending, ending]);
+
+  const busy = pending !== null || ending;
 
   async function send() {
-    if (!interview) return;
-    setSendError(null);
-    setSending(true);
+    if (!interview || busy) return;
+    const text = draft;
+    setFailed(null);
+    setPending(text);
+    setDraft("");
     try {
-      const updated = await api.submitAnswer(interview.id, draft);
-      setInterview(updated);
-      setDraft(""); // only cleared on success, so a failed send keeps the typed text
+      setInterview(await api.submitAnswer(interview.id, text));
     } catch (e) {
-      setSendError(e instanceof ApiError ? e.message : "Could not send the answer.");
+      setDraft(text);
+      setFailed({ message: e instanceof ApiError ? e.message : "Could not send the answer.", action: "send" });
     } finally {
-      setSending(false);
+      setPending(null);
     }
   }
 
-  async function endEarly() {
-    if (!interview || !window.confirm("End the interview now and get evaluated on the answers so far?")) return;
-    setSendError(null);
-    setSending(true);
+  async function endEarly({ confirmed = false } = {}) {
+    if (!interview || busy) return;
+    if (!confirmed && !window.confirm("End the interview now and get evaluated on the answers so far?")) return;
+    setFailed(null);
+    setEnding(true);
     try {
       setInterview(await api.endInterview(interview.id));
     } catch (e) {
-      setSendError(e instanceof ApiError ? e.message : "Could not end the interview.");
+      setFailed({ message: e instanceof ApiError ? e.message : "Could not end the interview.", action: "end" });
     } finally {
-      setSending(false);
+      setEnding(false);
     }
   }
 
   async function rerun() {
     if (!interview) return;
+    setFailed(null);
     try {
       setInterview(await api.rerunEvaluation(interview.id));
       setEvaluation("polling");
     } catch (e) {
-      setSendError(e instanceof ApiError ? e.message : "Could not re-run the evaluation.");
+      setFailed({ message: e instanceof ApiError ? e.message : "Could not re-run the evaluation." });
     }
   }
 
-  if (loadError) return <ErrorBanner message={loadError} onRetry={reload} />;
-  if (!interview) return <Spinner label="Loading interview..." />;
+  if (loadError)
+    return (
+      <Page title="Interview">
+        <ErrorBanner message={loadError} onRetry={reload} />
+      </Page>
+    );
+  if (!interview)
+    return (
+      <Page title="Interview">
+        <Spinner label="Loading interview..." />
+      </Page>
+    );
 
-  const answered = interview.messages.filter((m) => m.role === "answer").length;
+  const answered = interview.messages.filter((m) => m.role === "answer").length + (pending !== null ? 1 : 0);
+  const panel = (
+    <Panel interview={interview} answered={answered} onEnd={() => endEarly()} endDisabled={busy || answered === 0} />
+  );
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold">{interview.title}</h1>
-          <p className="text-sm text-zinc-500">
-            {interview.seniority} level · {interview.difficulty} difficulty
-            {interview.industry ? ` · ${interview.industry}` : ""}
-          </p>
+    <div className="flex h-full">
+      <section className="flex min-w-0 flex-1 flex-col">
+        {/* Below lg the side panel folds into this strip; tapping it shows the full panel. */}
+        <div className="border-b border-zinc-200 px-4 py-2 lg:hidden dark:border-zinc-800">
+          <button
+            onClick={() => setDetailsOpen((o) => !o)}
+            aria-expanded={detailsOpen}
+            className="flex w-full items-center gap-3 text-left text-sm"
+          >
+            <PersonaAvatar name={interview.persona_name} size="sm" />
+            <span className="flex-1">
+              <QuestionTracker interview={interview} answered={answered} compact />
+            </span>
+            <span className="sr-only">Interview details</span>
+            <ChevronDown className={`h-4 w-4 text-zinc-400 transition-transform ${detailsOpen ? "rotate-180" : ""}`} />
+          </button>
+          {detailsOpen && <div className="pt-4 pb-2">{panel}</div>}
         </div>
-        <span className="text-sm text-zinc-500">
-          Question {Math.min(interview.question_count, interview.question_cap)} of {interview.question_cap}
-        </span>
-      </header>
 
-      <ol className="space-y-3">
-        {interview.messages.map((m) => (
-          <ChatBubble key={m.id} message={m} />
-        ))}
-        <div ref={bottomRef} />
-      </ol>
-
-      {sendError && <ErrorBanner message={sendError} onRetry={interview.status === "in_progress" ? send : undefined} />}
-
-      {interview.status === "in_progress" ? (
-        <div className="space-y-3">
-          <textarea
-            className={`${inputClass} min-h-28`}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Type your answer. Situation, Task, Action, Result."
-            disabled={sending}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send();
-            }}
-          />
-          <div className="flex items-center gap-3">
-            <Button onClick={send} disabled={sending}>
-              Send
-            </Button>
-            <Button variant="secondary" onClick={endEarly} disabled={sending || answered === 0}>
-              End interview
-            </Button>
-            {sending && <Spinner label="The interviewer is thinking..." />}
-            <span className="ml-auto text-xs text-zinc-400">Ctrl+Enter to send</span>
-          </div>
+        <div className="flex-1 overflow-y-auto">
+          <ol className="mx-auto max-w-2xl space-y-6 px-4 py-8">
+            {interview.messages.map((m) => (
+              <Entry key={m.id} message={m} messages={interview.messages} personaName={interview.persona_name} />
+            ))}
+            {pending !== null && <AnswerBlock text={pending} dim />}
+            {busy && (
+              <li className="rounded-xl border border-dashed border-zinc-300 px-4 py-4 dark:border-zinc-700">
+                <ThinkingDots name={interview.persona_name} />
+              </li>
+            )}
+          </ol>
+          <div ref={bottomRef} />
         </div>
-      ) : (
-        <div className="flex items-center gap-3">
-          {evaluation === "missing" ? (
-            <Button onClick={rerun}>Re-run evaluation</Button>
+
+        <div className="mx-auto w-full max-w-2xl space-y-3 px-4 pb-4">
+          {failed && (
+            <ErrorBanner
+              message={failed.message}
+              onRetry={failed.action === "send" ? send : failed.action === "end" ? () => endEarly({ confirmed: true }) : undefined}
+            />
+          )}
+          {interview.status === "in_progress" ? (
+            <Composer draft={draft} setDraft={setDraft} onSend={send} busy={busy} personaName={interview.persona_name} />
           ) : (
-            <Button onClick={() => router.push(`/interviews/${interview.id}/evaluation`)} disabled={evaluation !== "ready"}>
-              See evaluation
-            </Button>
-          )}
-          {evaluation === "polling" && <Spinner label="The judge is reviewing your answers..." />}
-          {evaluation === "missing" && (
-            <span className="text-sm text-red-700 dark:text-red-400">The evaluation could not be produced.</span>
+            <JudgingFooter
+              state={evaluation}
+              onOpen={() => router.push(`/interviews/${interview.id}/evaluation`)}
+              onRerun={rerun}
+            />
           )}
         </div>
+      </section>
+
+      <aside className="hidden w-80 shrink-0 overflow-y-auto border-l border-zinc-200 bg-zinc-50/60 p-5 lg:block dark:border-zinc-800 dark:bg-zinc-900/40">
+        {panel}
+      </aside>
+    </div>
+  );
+}
+
+function Panel({
+  interview,
+  answered,
+  onEnd,
+  endDisabled,
+}: {
+  interview: Interview;
+  answered: number;
+  onEnd: () => void;
+  endDisabled: boolean;
+}) {
+  const seniority = SENIORITY_OPTIONS.find((o) => o.value === interview.seniority)?.label;
+  const difficulty = DIFFICULTY_OPTIONS.find((o) => o.value === interview.difficulty)?.label;
+  return (
+    <div className="space-y-7">
+      <div className="flex items-center gap-3">
+        <PersonaAvatar name={interview.persona_name} size="lg" />
+        <div className="min-w-0">
+          <p className="font-semibold">{interview.persona_name}</p>
+          <p className="text-sm text-zinc-500">{interview.persona_title}</p>
+        </div>
+      </div>
+
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+        <dt className="text-zinc-500">Job</dt>
+        <dd className="font-medium">{interview.title}</dd>
+        {interview.industry && (
+          <>
+            <dt className="text-zinc-500">Industry</dt>
+            <dd>{interview.industry}</dd>
+          </>
+        )}
+        <dt className="text-zinc-500">Seniority</dt>
+        <dd>{seniority}</dd>
+        <dt className="text-zinc-500">Difficulty</dt>
+        <dd>{difficulty}</dd>
+      </dl>
+
+      <QuestionTracker interview={interview} answered={answered} />
+
+      <div>
+        <p className="mb-2 text-sm font-medium">A strong answer covers</p>
+        <ul className="space-y-2">
+          {STAR_PARTS.map((part) => (
+            <li key={part.key} className="flex gap-3 text-sm">
+              <StarLetter letter={part.label[0]} />
+              <span>
+                <span className="font-medium">{part.label}</span>
+                <span className="block text-zinc-500">{part.hint}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {interview.status === "in_progress" && (
+        <Button variant="secondary" onClick={onEnd} disabled={endDisabled} className="w-full">
+          <Flag className="h-3.5 w-3.5" />
+          End interview
+        </Button>
       )}
     </div>
   );
 }
 
-function ChatBubble({ message }: { message: Message }) {
-  const mine = message.role === "answer";
-  const style = mine
-    ? "ml-auto bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-    : message.role === "closing"
-      ? "bg-amber-50 dark:bg-amber-950"
-      : "bg-zinc-100 dark:bg-zinc-800";
+// One segment per Question: answered ones filled, the open Question outlined, the rest empty.
+function QuestionTracker({ interview, answered, compact = false }: { interview: Interview; answered: number; compact?: boolean }) {
+  const cap = interview.question_cap;
+  const open = interview.status === "in_progress";
+  const summary = open
+    ? `Question ${Math.min(answered + 1, cap)} of ${cap}`
+    : interview.ended_early
+      ? `Ended after ${answered}`
+      : `${answered} of ${cap} answered`;
   return (
-    <li className={`max-w-[85%] whitespace-pre-wrap rounded-lg px-4 py-2 text-sm ${style}`}>
-      {message.text || <em className="opacity-60">(no answer given)</em>}
+    <div>
+      {!compact && (
+        <p className="mb-2 flex justify-between text-sm">
+          <span className="font-medium">Questions</span>
+          <span className="tabular-nums text-zinc-500">{summary}</span>
+        </p>
+      )}
+      <div className="flex gap-1" role="img" aria-label={summary}>
+        {Array.from({ length: cap }, (_, i) => (
+          <span
+            key={i}
+            className={`h-1.5 flex-1 rounded-full ${
+              i < answered
+                ? "bg-indigo-600 dark:bg-indigo-400"
+                : open && i === answered
+                  ? "bg-indigo-200 ring-1 ring-indigo-500 dark:bg-indigo-500/30"
+                  : "bg-zinc-200 dark:bg-zinc-800"
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Each Question is numbered, since the Interview really is a sequence of up to ten.
+function Entry({ message, messages, personaName }: { message: Message; messages: Message[]; personaName: string }) {
+  if (message.role === "answer") return <AnswerBlock text={message.text} />;
+  if (message.role === "closing") {
+    return (
+      <li className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-3 text-[15px] leading-relaxed dark:border-indigo-500/30 dark:bg-indigo-500/10">
+        <p className="mb-1 text-xs font-medium text-indigo-700 dark:text-indigo-300">Closing from {personaName}</p>
+        {message.text}
+      </li>
+    );
+  }
+  const number = messages.filter((m) => m.role === "question" && m.position <= message.position).length;
+  return (
+    <li className="flex gap-3">
+      <span className="w-5 shrink-0 pt-1 text-right text-sm font-semibold tabular-nums text-indigo-600 dark:text-indigo-400">
+        {number}
+      </span>
+      <p className="whitespace-pre-wrap text-[17px] font-medium leading-relaxed">{message.text}</p>
     </li>
+  );
+}
+
+function AnswerBlock({ text, dim = false }: { text: string; dim?: boolean }) {
+  return (
+    <li
+      className={`ml-8 whitespace-pre-wrap rounded-xl bg-zinc-100 px-4 py-3 text-[15px] leading-relaxed dark:bg-zinc-800/80 ${dim ? "opacity-60" : ""}`}
+    >
+      {text || <em className="text-zinc-500">(no answer given)</em>}
+    </li>
+  );
+}
+
+function ThinkingDots({ name }: { name: string }) {
+  return (
+    <span className="inline-flex items-center gap-1" role="status" aria-label={`${name} is thinking`}>
+      {[0, 150, 300].map((delay) => (
+        <span
+          key={delay}
+          className="h-1.5 w-1.5 rounded-full bg-zinc-400 motion-safe:animate-bounce"
+          style={{ animationDelay: `${delay}ms` }}
+        />
+      ))}
+    </span>
+  );
+}
+
+function Composer({
+  draft,
+  setDraft,
+  onSend,
+  busy,
+  personaName,
+}: {
+  draft: string;
+  setDraft: (s: string) => void;
+  onSend: () => void;
+  busy: boolean;
+  personaName: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-end gap-2 rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-500/10 dark:border-zinc-800 dark:bg-zinc-900">
+        <textarea
+          aria-label="Your answer"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              onSend();
+            }
+          }}
+          disabled={busy}
+          rows={2}
+          placeholder="Describe the situation, what you did, and the result."
+          className="max-h-48 min-h-12 flex-1 resize-none bg-transparent px-2 py-1.5 text-[15px] leading-relaxed outline-none field-sizing-content placeholder:text-zinc-400 disabled:opacity-50 dark:placeholder:text-zinc-500"
+        />
+        {/* Enabled even when empty: an empty Answer is still an Answer (spec). */}
+        <button
+          aria-label="Send answer"
+          onClick={onSend}
+          disabled={busy}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600"
+        >
+          <ArrowUp className="h-4 w-4" />
+        </button>
+      </div>
+      <p className="px-2 text-xs text-zinc-400">{busy ? `${personaName} is reading your answer.` : "Ctrl+Enter to send"}</p>
+    </div>
+  );
+}
+
+function JudgingFooter({
+  state,
+  onOpen,
+  onRerun,
+}: {
+  state: EvaluationState;
+  onOpen: () => void;
+  onRerun: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+      <span className="flex-1 text-sm text-zinc-600 dark:text-zinc-400">
+        {state === "polling" && <Spinner label="Interview finished. The judge is scoring your answers." />}
+        {state === "ready" && "Interview finished. Your evaluation is ready."}
+        {state === "missing" && <span className="text-red-700 dark:text-red-400">The evaluation could not be produced.</span>}
+      </span>
+      {state === "missing" ? (
+        <Button onClick={onRerun}>
+          <RotateCw className="h-4 w-4" />
+          Re-run evaluation
+        </Button>
+      ) : (
+        <Button onClick={onOpen} disabled={state !== "ready"}>
+          <ClipboardCheck className="h-4 w-4" />
+          See evaluation
+        </Button>
+      )}
+    </div>
   );
 }

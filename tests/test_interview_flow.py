@@ -3,6 +3,8 @@ import json
 from interview_app.llm import LLMUnavailable
 from interview_app.models import Interview, Message
 
+PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering"})
+
 
 def _judge_reply(answers: int) -> str:
     r = {"rating": 3, "comment": "ok"}
@@ -18,7 +20,7 @@ def _judge_reply(answers: int) -> str:
 
 
 def _start(client, llm, **overrides):
-    llm.responses.append("Hello! Tell me about a time you led a project.")
+    llm.responses += [PERSONA, "Hello! Tell me about a time you led a project."]
     body = {"title": "Backend Engineer", "seniority": "senior", "difficulty": "hard"} | overrides
     r = client.post("/interviews", json=body)
     assert r.status_code == 201, r.text
@@ -32,13 +34,14 @@ def test_start_returns_greeting_and_first_question(client, llm):
     assert data["messages"][0]["role"] == "question"
     assert data["messages"][0]["text"].startswith("Hello!")
 
-    system = llm.calls[0]["messages"][0]["content"]
+    first_question_call = llm.calls[1]  # calls[0] creates the Persona
+    system = first_question_call["messages"][0]["content"]
     assert "Backend Engineer" in system
     assert "senior level" in system
     assert "fintech" in system
     assert "Difficulty: HARD" in system
     assert "Build payment APIs." in system
-    assert llm.calls[0]["messages"][-1]["content"] == "Please begin the interview."
+    assert first_question_call["messages"][-1]["content"] == "Please begin the interview."
 
 
 def test_title_is_required(client):
@@ -136,7 +139,7 @@ def test_llm_failure_leaves_no_partial_answer(client, llm, db):
 
 
 def test_llm_failure_on_start_creates_nothing(client, llm, db):
-    llm.responses.append(LLMUnavailable("down"))
+    llm.responses += [PERSONA, LLMUnavailable("down")]
     r = client.post("/interviews", json={"title": "PM"})
     assert r.status_code == 503
     assert db.query(Interview).count() == 0
