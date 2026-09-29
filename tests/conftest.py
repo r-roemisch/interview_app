@@ -1,4 +1,9 @@
+import os
 from collections.abc import Iterator
+
+# Safety net, set before the app is imported: a model client a test forgets to replace with a fake
+# becomes an offline dev fake instead of a real, paid call with the key from .env.
+os.environ["LLM_PROVIDER"] = "fake"
 
 import pytest
 from sqlalchemy import create_engine
@@ -8,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 
 from interview_app import db as db_module
 from interview_app.db import Base, get_db, get_session_factory
+from interview_app.images import FakeImageClient, get_image_client
 from interview_app.jev import FakeJevClient, get_jev_client
 from interview_app.llm import FakeLLMClient, get_llm_client
 from interview_app.main import create_app
@@ -57,7 +63,13 @@ def speech() -> FakeSpeechClient:
 
 
 @pytest.fixture
-def client(engine, db, llm, jev, speech, monkeypatch) -> Iterator[TestClient]:
+def images() -> FakeImageClient:
+    """A fixed Portrait. Put exceptions in `images.errors` to make the next calls fail."""
+    return FakeImageClient()
+
+
+@pytest.fixture
+def client(engine, db, llm, jev, speech, images, monkeypatch) -> Iterator[TestClient]:
     """TestClient wired to the in-memory database and the fake LLM."""
     monkeypatch.setattr(db_module, "engine", engine)
     app = create_app()
@@ -72,6 +84,7 @@ def client(engine, db, llm, jev, speech, monkeypatch) -> Iterator[TestClient]:
     app.dependency_overrides[get_llm_client] = override_llm
     app.dependency_overrides[get_jev_client] = lambda: jev
     app.dependency_overrides[get_speech_client] = lambda: speech
+    app.dependency_overrides[get_image_client] = lambda: images
     app.dependency_overrides[get_session_factory] = lambda: sessionmaker(
         bind=engine, autoflush=False, expire_on_commit=False
     )

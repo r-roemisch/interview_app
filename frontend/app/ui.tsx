@@ -5,7 +5,8 @@
 
 import { AlertCircle, Loader2, RotateCw } from "lucide-react";
 import Link from "next/link";
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
+import { portraitUrl, type PortraitState } from "@/lib/api";
 
 const buttonBase =
   "inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors " +
@@ -148,15 +149,45 @@ function initials(name: string): string {
   return (first + last).toUpperCase();
 }
 
-/** The Persona's initials in a circle. Pictures are out of scope (spec). */
-export function PersonaAvatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
-  const dims = { sm: "h-7 w-7 text-[11px]", md: "h-9 w-9 text-xs", lg: "h-14 w-14 text-base" }[size];
+/** The Persona's face: its Portrait when ready, otherwise its initials, softly pulsing while the
+ * Portrait is being made. "panel" fills the width of the Interview page's side panel. */
+export function PersonaAvatar({
+  name,
+  size = "md",
+  interviewId,
+  portrait = "none",
+}: {
+  name: string;
+  size?: "sm" | "md" | "lg" | "panel";
+  interviewId?: number;
+  portrait?: PortraitState;
+}) {
+  // The image fades in once the browser has it, over the initials.
+  const [loaded, setLoaded] = useState(false);
+  const dims = {
+    sm: "h-7 w-7 rounded-full text-[11px]",
+    md: "h-9 w-9 rounded-full text-xs",
+    lg: "h-14 w-14 rounded-full text-base",
+    panel: "aspect-square w-full rounded-2xl text-4xl",
+  }[size];
   return (
     <span
       aria-hidden
-      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-indigo-100 font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300 ${dims}`}
+      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden bg-indigo-100 font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300 ${dims} ${
+        portrait === "pending" ? "motion-safe:animate-pulse" : ""
+      }`}
     >
       {initials(name)}
+      {portrait === "ready" && interviewId !== undefined && (
+        // A plain <img>: the Portrait comes from our own backend, Next's image optimisation adds nothing.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={portraitUrl(interviewId)}
+          alt=""
+          onLoad={() => setLoaded(true)}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${loaded ? "opacity-100" : "opacity-0"}`}
+        />
+      )}
     </span>
   );
 }

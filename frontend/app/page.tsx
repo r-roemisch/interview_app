@@ -20,6 +20,7 @@ export default function SetupPage() {
   const [cv, setCv] = useState("");
   const [judge, setJudge] = useState<Judge>("llm");
   const [mode, setMode] = useState<"written" | "voice">("written");
+  const [portrait, setPortrait] = useState(true);
 
   const [recommending, setRecommending] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -63,6 +64,7 @@ export default function SetupPage() {
         cv: cv.trim() || null,
         judge,
         voice_interview: mode === "voice",
+        portrait,
       });
       router.push(`/interviews/${interview.id}`);
     } catch (e) {
@@ -132,7 +134,19 @@ export default function SetupPage() {
             </fieldset>
           </div>
 
-          <ChoiceCards legend="Interview" name="mode" options={MODE_OPTIONS} value={mode} onChange={setMode} />
+          <div>
+            <ChoiceCards legend="Interview" name="mode" options={MODE_OPTIONS} value={mode} onChange={setMode} />
+            <label className="mt-3 flex cursor-pointer items-center gap-2.5 text-sm">
+              <input
+                type="checkbox"
+                checked={portrait}
+                onChange={(e) => setPortrait(e.target.checked)}
+                className="h-4 w-4 accent-indigo-600"
+              />
+              Show a portrait of the interviewer
+              <span className="text-zinc-600 dark:text-zinc-400">(about 4 cents)</span>
+            </label>
+          </div>
 
           <ChoiceCards legend="Difficulty" name="difficulty" options={DIFFICULTY_OPTIONS} value={difficulty} onChange={setDifficulty} />
 

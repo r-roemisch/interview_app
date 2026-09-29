@@ -5,7 +5,20 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from enum import StrEnum
 
-from sqlalchemy import JSON, Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text, TypeDecorator, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    TypeDecorator,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from interview_app.db import Base
@@ -57,6 +70,12 @@ class MessageRole(StrEnum):
     QUESTION = "question"
     ANSWER = "answer"
     CLOSING = "closing"
+
+
+class PortraitStatus(StrEnum):
+    PENDING = "pending"
+    READY = "ready"
+    FAILED = "failed"
 
 
 class Verdict(StrEnum):
@@ -119,6 +138,12 @@ class Interview(Base):
     )
     # At most one Evaluation per Judge.
     evaluations: Mapped[list[Evaluation]] = relationship(back_populates="interview", cascade="all, delete-orphan")
+    # None when no Portrait was asked for at Setup (and for Interviews from before Portraits).
+    portrait: Mapped[Portrait | None] = relationship(back_populates="interview", cascade="all, delete-orphan")
+
+    @property
+    def portrait_state(self) -> str:
+        return self.portrait.status.value if self.portrait else "none"
 
     @property
     def evaluation(self) -> Evaluation | None:
@@ -173,3 +198,17 @@ class Evaluation(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=_now)
 
     interview: Mapped[Interview] = relationship(back_populates="evaluations")
+
+
+class Portrait(Base):
+    """The Persona's Portrait (CONTEXT.md). Its own table, so adding it needed no change to `interviews`."""
+
+    __tablename__ = "portraits"
+
+    interview_id: Mapped[int] = mapped_column(ForeignKey("interviews.id", ondelete="CASCADE"), primary_key=True)
+    status: Mapped[PortraitStatus] = mapped_column(_enum(PortraitStatus), default=PortraitStatus.PENDING)
+    # The PNG as generated (about 1.3 MB), None until ready. Deferred: loaded only when served.
+    image: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True, deferred=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=_now)
+
+    interview: Mapped[Interview] = relationship(back_populates="portrait")

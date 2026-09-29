@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -32,6 +33,8 @@ class InterviewOut(BaseModel):
     persona_title: str
     persona_voice: str
     voice_interview: bool
+    # "none" when no Portrait was asked for (CONTEXT.md: Portrait)
+    portrait: Literal["none", "pending", "ready", "failed"] = Field(validation_alias="portrait_state")
     status: InterviewStatus
     ended_early: bool
     created_at: datetime

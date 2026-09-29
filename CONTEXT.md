@@ -53,8 +53,12 @@ An Interview that no longer accepts Answers but whose Evaluation could not be pr
 _Avoid_: Failed, errored, pending
 
 **Persona**:
-The name and job title the interviewer presents as during one Interview, invented to fit the Job. It decides who is asking, never how: tone and strictness belong to Difficulty. The Persona speaks in Questions and the Closing, never in the Evaluation. In a Voice Interview the Persona has its own voice, which belongs to who is asking.
+The name and job title the interviewer presents as during one Interview, invented to fit the Job. It decides who is asking, never how: tone and strictness belong to Difficulty. The Persona speaks in Questions and the Closing, never in the Evaluation. In a Voice Interview the Persona has its own voice, which belongs to who is asking. A Persona may have a Portrait.
 _Avoid_: Character, avatar, interviewer profile
+
+**Portrait**:
+A picture of the Persona, invented to fit its name, job title and voice and the Job's industry. Optional, chosen at Setup. It belongs to one Interview and stays the same for all of it; Practice again gets a new Persona and so a new Portrait.
+_Avoid_: Avatar, photo, picture, image
 
 **Question**:
 One message from the interviewer to the candidate. Follow-up questions are Questions too and count toward the cap.

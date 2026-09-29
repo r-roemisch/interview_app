@@ -18,6 +18,7 @@ from interview_app.models import (
     Judge,
     Message,
     MessageRole,
+    Portrait,
     Seniority,
 )
 from interview_app.prompts.interviewer import messages_for_closing, messages_for_next_question
@@ -62,7 +63,10 @@ def start_interview(
     cv: str | None = None,
     judge: Judge = Judge.LLM,
     voice_interview: bool = False,
+    portrait: bool = False,
 ) -> Interview:
+    """Commits the Interview with its first Question. With `portrait`, a Pending Portrait is added;
+    the caller schedules its generation."""
     interview = Interview(
         title=title.strip(),
         industry=industry.strip() if industry else None,
@@ -72,6 +76,7 @@ def start_interview(
         cv=(cv or "").strip() or None,
         judge=judge,
         voice_interview=voice_interview,
+        portrait=Portrait() if portrait else None,
     )
     persona = create_persona(llm, interview)
     interview.persona_name, interview.persona_title, interview.persona_voice = persona.name, persona.title, persona.voice

@@ -22,6 +22,10 @@ I started the interview practice app with the goal in mind to make it as soon as
 
 Another goal is to create as many features as possible to get a feel what is helpful, what is not helpful and what might be extra. I will write down every feature and how it worked and if it stays or is going to be removed
 
+Chronicles:
+- i did not like the background in plain white, so i made some shades. I preferred a calm and clean background over a colourful. The focus stays on the interview.
+
+
 
 <!-- OWNER SECTION END -->
 
@@ -40,6 +44,8 @@ The frontend is a thin client. Every page is a client component and all logic, i
 Each Interview is scored by the Judge chosen on Setup: the LLM Judge, which writes feedback, or the JEV Judge, which only rates and gives its confidence (ADR-0003). The Evaluation page can run the other Judge on the same transcript and show both side by side.
 
 A Voice Interview (chosen on Setup) reads every Question and the Closing aloud in the Persona's voice (`TTS_MODEL`) and adds a mic button to the Answer box: the recording is transcribed (`STT_MODEL`) into the box, where you edit it and send it like a typed Answer. No audio is stored (ADR-0004). Both directions use the audio chat model `openai/gpt-audio-mini`, prompted to read a text word for word or to write down a recording; the browser converts each recording to WAV first (ADR-0005). The mic works on http://localhost without HTTPS.
+
+The interviewer can have a Portrait (a switch on Setup, on by default, about 4 cents): a photorealistic headshot of the Persona made by `IMAGE_MODEL` in the background while the Interview starts. It is saved with the Interview and shown in the side panel on the left, with the initials pulsing until it arrives; if it cannot be made, the initials stay.
 
 ## Prerequisites
 
@@ -89,6 +95,7 @@ Backend, in `.env` at the repo root:
 | `JEV_MODEL` | `typesafe/jev-1.13` | OpenRouter id of JEV, used by the JEV Judge. Keep it pinned: JEV's confidence values only mean something for one version |
 | `STT_MODEL` | `openai/gpt-audio-mini` | Transcribes spoken Answers in a Voice Interview. Must be an audio chat model on your OpenRouter allow-list (ADR-0005) |
 | `TTS_MODEL` | `openai/gpt-audio-mini` | The interviewer's voice in a Voice Interview. Must be an audio chat model on your allow-list. The Persona voices in `models.py` are this model's voices |
+| `IMAGE_MODEL` | `google/gemini-2.5-flash-image` | Makes the interviewer's Portrait. Must be an image model on your allow-list |
 | `LLM_PROVIDER` | `openrouter` | `openrouter` for real calls, `fake` for an offline scripted interviewer and judge |
 | `OPENROUTER_API_KEY` | empty | Required when `LLM_PROVIDER=openrouter` |
 | `LLM_MODEL` | `google/gemma-4-31b-it:free` | Any OpenRouter model id. Free ones are listed at https://openrouter.ai/models?q=free |
@@ -116,7 +123,7 @@ Both are configured at https://openrouter.ai/workspaces/default/guardrails. Free
 
 ### Developing without a key
 
-Set `LLM_PROVIDER=fake`. The backend then uses a fixed Persona (Sam Taylor, Engineering Manager), asks ten fixed behavioral questions, writes a closing message and returns a fixed evaluation. The JEV Judge is faked too, with plausible scores, and so is speech: silent audio and a fixed transcription. Everything else, including history, resume, re-run and delete, behaves exactly as with a real model.
+Set `LLM_PROVIDER=fake`. The backend then uses a fixed Persona (Sam Taylor, Engineering Manager), asks ten fixed behavioral questions, writes a closing message and returns a fixed evaluation. The JEV Judge is faked too, with plausible scores, and so is speech: silent audio and a fixed transcription. A Portrait is a plain placeholder square that appears after two seconds. Everything else, including history, resume, re-run and delete, behaves exactly as with a real model.
 
 ## Tests
 
@@ -143,6 +150,7 @@ src/interview_app/
   llm.py            OpenRouter client, retries, fake clients
   jev.py            JEV client (plain HTTP to OpenRouter's /systemone), fake clients
   speech.py         text-to-speech and transcription for Voice Interviews, fake clients
+  images.py         the Persona's Portrait (image model), fake clients
   prompts/          interviewer, Persona, LLM Judge, JEV Judge + Checklist, recommended-settings prompts
   services/         interview flow, LLM Judge, JEV Judge, recommendation, PDF text extraction
   routers/          HTTP endpoints

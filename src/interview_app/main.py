@@ -10,6 +10,7 @@ from interview_app.config import get_settings
 from interview_app.db import create_tables
 from interview_app.routers import cv, extract, interviews, recommend, speech
 from interview_app.services.judge import fail_interrupted_judges
+from interview_app.services.portrait import fail_unfinished_portraits
 
 
 @asynccontextmanager
@@ -17,6 +18,7 @@ async def lifespan(app: FastAPI):
     create_tables()
     with Session(db_module.engine) as db:
         fail_interrupted_judges(db)
+        fail_unfinished_portraits(db)
     yield
 
 

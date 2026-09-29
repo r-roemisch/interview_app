@@ -181,7 +181,7 @@ export default function EvaluationPage() {
 
             <section>
               <div className="mb-5 flex items-center gap-3">
-                <PersonaAvatar name={interview.persona_name} />
+                <PersonaAvatar name={interview.persona_name} interviewId={interview.id} portrait={interview.portrait} />
                 <div>
                   <h2 className="text-lg font-semibold">Transcript and STAR breakdown</h2>
                   <p className="text-sm text-zinc-600 dark:text-zinc-400">

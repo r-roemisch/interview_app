@@ -107,6 +107,20 @@ export default function InterviewPage() {
     if (latest && !muted) play(audioRef, speechUrl(interview.id, latest.id));
   }, [interview, muted]);
 
+  // While the Portrait is being made, ask every 2 s whether it is ready. Only the Portrait state is
+  // taken from the answer, so a slow poll can never overwrite a newer transcript.
+  const portraitPending = interview?.portrait === "pending";
+  useEffect(() => {
+    if (!portraitPending) return;
+    const timer = setInterval(() => {
+      api
+        .getInterview(interviewId)
+        .then((iv) => setInterview((current) => current && { ...current, portrait: iv.portrait }))
+        .catch(() => {}); // try again on the next tick
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [portraitPending, interviewId]);
+
   // Stop speaking when leaving the page.
   useEffect(() => () => audioRef.current?.pause(), []);
 
@@ -189,6 +203,10 @@ export default function InterviewPage() {
 
   return (
     <div className="flex h-full">
+      {/* The interviewer sits on the left, like the other person in a video call (spec: portrait). */}
+      <aside className={`hidden w-80 shrink-0 overflow-y-auto border-r border-zinc-200/70 p-5 lg:block dark:border-zinc-800/70 ${glassClass}`}>
+        {panel}
+      </aside>
       <section className="flex min-w-0 flex-1 flex-col">
         {/* Below lg the side panel folds into this strip; tapping it shows the full panel. */}
         <div className={`border-b border-zinc-200/70 px-4 py-2 lg:hidden dark:border-zinc-800/70 ${glassClass}`}>
@@ -197,7 +215,7 @@ export default function InterviewPage() {
             aria-expanded={detailsOpen}
             className="flex w-full items-center gap-3 text-left text-sm"
           >
-            <PersonaAvatar name={interview.persona_name} size="sm" />
+            <PersonaAvatar name={interview.persona_name} size="sm" interviewId={interview.id} portrait={interview.portrait} />
             <span className="flex-1">
               <QuestionTracker interview={interview} answered={answered} compact />
             </span>
@@ -257,9 +275,6 @@ export default function InterviewPage() {
         </div>
       </section>
 
-      <aside className={`hidden w-80 shrink-0 overflow-y-auto border-l border-zinc-200/70 p-5 lg:block dark:border-zinc-800/70 ${glassClass}`}>
-        {panel}
-      </aside>
     </div>
   );
 }
@@ -283,12 +298,10 @@ function Panel({
   const difficulty = DIFFICULTY_OPTIONS.find((o) => o.value === interview.difficulty)?.label;
   return (
     <div className="space-y-7">
-      <div className="flex items-center gap-3">
-        <PersonaAvatar name={interview.persona_name} size="lg" />
-        <div className="min-w-0">
-          <p className="font-semibold">{interview.persona_name}</p>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{interview.persona_title}</p>
-        </div>
+      <div>
+        <PersonaAvatar name={interview.persona_name} size="panel" interviewId={interview.id} portrait={interview.portrait} />
+        <p className="mt-3 font-semibold">{interview.persona_name}</p>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">{interview.persona_title}</p>
       </div>
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">

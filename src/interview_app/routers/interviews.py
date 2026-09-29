@@ -6,12 +6,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from interview_app.db import get_db, get_session_factory
+from interview_app.images import ImageClient, get_image_client, image_type
 from interview_app.jev import JevClient, get_jev_client
 from interview_app.llm import LLMClient, LLMUnavailable, get_llm_client
-from interview_app.models import Difficulty, Interview, InterviewStatus, Judge, Seniority
+from interview_app.models import Difficulty, Interview, InterviewStatus, Judge, PortraitStatus, Seniority
 from interview_app.schemas import EvaluationOut, HistoryRow, InterviewOut
 from interview_app.services import interview as svc
 from interview_app.services import judge
+from interview_app.services import portrait as portrait_svc
 
 router = APIRouter(prefix="/interviews", tags=["interviews"])
 
@@ -25,6 +27,7 @@ class InterviewCreate(BaseModel):
     cv: str | None = Field(default=None, max_length=20_000)
     judge: Judge = Judge.LLM
     voice_interview: bool = False
+    portrait: bool = True
 
 
 class AnswerIn(BaseModel):
@@ -53,14 +56,24 @@ def _judge_trigger(background: BackgroundTasks, session_factory, llm: LLMClient,
     return trigger
 
 
+def _schedule_portrait(background: BackgroundTasks, session_factory, images: ImageClient, interview: Interview) -> None:
+    if interview.portrait is not None:
+        background.add_task(
+            portrait_svc.generate_in_background, interview.id, session_factory=session_factory, images=images
+        )
+
+
 @router.post("", response_model=InterviewOut, status_code=status.HTTP_201_CREATED)
 def create_interview(
     body: InterviewCreate,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     llm: LLMClient = Depends(get_llm_client),
+    session_factory=Depends(get_session_factory),
+    images: ImageClient = Depends(get_image_client),
 ) -> Interview:
     try:
-        return svc.start_interview(
+        interview = svc.start_interview(
             db,
             llm,
             title=body.title,
@@ -71,9 +84,12 @@ def create_interview(
             cv=body.cv,
             judge=body.judge,
             voice_interview=body.voice_interview,
+            portrait=body.portrait,
         )
     except LLMUnavailable as exc:
         raise _llm_unavailable(exc) from exc
+    _schedule_portrait(background, session_factory, images, interview)
+    return interview
 
 
 @router.get("", response_model=list[HistoryRow])
@@ -132,6 +148,15 @@ def end_interview(
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except LLMUnavailable as exc:
         raise _llm_unavailable(exc) from exc
+
+
+@router.get("/{interview_id}/portrait")
+def get_portrait(interview: Interview = Depends(load_interview)) -> Response:
+    """The Portrait as generated (usually PNG), once it is ready."""
+    portrait = interview.portrait
+    if portrait is None or portrait.status != PortraitStatus.READY or portrait.image is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No portrait for this interview")
+    return Response(content=portrait.image, media_type=image_type(portrait.image) or "image/png")
 
 
 @router.get("/{interview_id}/evaluation", response_model=EvaluationOut)
@@ -208,13 +233,17 @@ def delete_interview(interview: Interview = Depends(load_interview), db: Session
 
 @router.post("/{interview_id}/practice-again", response_model=InterviewOut, status_code=status.HTTP_201_CREATED)
 def practice_again(
+    background: BackgroundTasks,
     interview: Interview = Depends(load_interview),
     db: Session = Depends(get_db),
     llm: LLMClient = Depends(get_llm_client),
+    session_factory=Depends(get_session_factory),
+    images: ImageClient = Depends(get_image_client),
 ) -> Interview:
-    """New Interview from the same Job snapshot, Difficulty, CV, Judge and voice setting; fresh Persona."""
+    """New Interview from the same Job snapshot, Difficulty, CV, Judge, voice and Portrait settings;
+    fresh Persona, so a fresh Portrait."""
     try:
-        return svc.start_interview(
+        again = svc.start_interview(
             db,
             llm,
             title=interview.title,
@@ -225,6 +254,9 @@ def practice_again(
             cv=interview.cv,
             judge=interview.judge,
             voice_interview=interview.voice_interview,
+            portrait=interview.portrait is not None,
         )
     except LLMUnavailable as exc:
         raise _llm_unavailable(exc) from exc
+    _schedule_portrait(background, session_factory, images, again)
+    return again

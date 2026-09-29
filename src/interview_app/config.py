@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     # Voice Interviews: an audio chat model for both directions (ADR-0005)
     stt_model: str = "openai/gpt-audio-mini"
     tts_model: str = "openai/gpt-audio-mini"
+    image_model: str = "google/gemini-2.5-flash-image"
     database_url: str = "sqlite:///./interview.db"
     cors_origins: str = "http://localhost:3000"
 

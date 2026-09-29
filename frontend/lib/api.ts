@@ -7,6 +7,8 @@ export type Judge = "llm" | "jev";
 export type InterviewStatus = "in_progress" | "judging" | "completed" | "evaluation_missing";
 export type MessageRole = "question" | "answer" | "closing";
 export type Verdict = "strong_hire" | "hire" | "no_hire";
+// "none": no Portrait was asked for at Setup (or the Interview is older than Portraits).
+export type PortraitState = "none" | "pending" | "ready" | "failed";
 
 export interface Message {
   id: number;
@@ -27,6 +29,7 @@ export interface Interview {
   persona_title: string;
   persona_voice: string;
   voice_interview: boolean;
+  portrait: PortraitState;
   status: InterviewStatus;
   ended_early: boolean;
   created_at: string;
@@ -44,6 +47,7 @@ export interface InterviewCreate {
   cv?: string | null;
   judge: Judge;
   voice_interview: boolean;
+  portrait: boolean;
 }
 
 export interface HistoryRow {
@@ -136,6 +140,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 /** WAV of an interviewer message in the Persona's voice; used directly as an <audio> source. */
 export const speechUrl = (interviewId: number, messageId: number) =>
   `${API_URL}/interviews/${interviewId}/messages/${messageId}/speech`;
+
+/** The Persona's Portrait (PNG) once its state is "ready"; used directly as an <img> source. */
+export const portraitUrl = (interviewId: number) => `${API_URL}/interviews/${interviewId}/portrait`;
 
 const json = (body: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(body) });
 
