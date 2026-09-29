@@ -7,7 +7,7 @@ from interview_app.llm import LLMUnavailable
 from interview_app.main import create_app
 from interview_app.models import Evaluation, Interview, InterviewStatus
 
-PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "Kore"})
+PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "coral"})
 
 
 def _rating(n=4, c="ok"):

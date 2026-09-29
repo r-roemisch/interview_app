@@ -4,7 +4,7 @@ import pytest
 
 from interview_app.llm import LLMUnavailable
 
-PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "Kore"})
+PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "coral"})
 
 
 def _judge_reply(answers: int) -> str:
@@ -71,7 +71,7 @@ def test_persona_reaches_interviewer_but_not_judge(client, llm):
         LLMUnavailable("down"),
         "Sure! Your interviewer is Priya.",
         json.dumps({"name": "Priya Nair"}),
-        json.dumps({"name": "  ", "title": "Head of Engineering", "voice": "Kore"}),
+        json.dumps({"name": "  ", "title": "Head of Engineering", "voice": "coral"}),
         json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "darth"}),
         json.dumps({"name": "Priya Nair", "title": "Head of Engineering"}),
     ],
@@ -80,7 +80,7 @@ def test_persona_reaches_interviewer_but_not_judge(client, llm):
 def test_failed_persona_call_falls_back_and_interview_still_starts(client, llm, persona_reply):
     data = _start(client, llm, persona_reply=persona_reply)
     assert (data["persona_name"], data["persona_title"]) == ("Alex Morgan", "Hiring Manager")
-    assert data["persona_voice"] == "Charon"
+    assert data["persona_voice"] == "cedar"
     assert data["question_count"] == 1
     assert len(llm.calls) == 2  # no retry of the Persona call
     assert "You are Alex Morgan, Hiring Manager" in llm.calls[1]["messages"][0]["content"]
@@ -94,7 +94,7 @@ def test_code_fenced_persona_is_accepted(client, llm):
 def test_practice_again_gets_a_fresh_persona(client, llm):
     iid = _start(client, llm)["id"]
 
-    llm.responses += [json.dumps({"name": "Tom Berg", "title": "VP Engineering", "voice": "Orus"}), "Hi, I'm Tom. Q1?"]
+    llm.responses += [json.dumps({"name": "Tom Berg", "title": "VP Engineering", "voice": "ash"}), "Hi, I'm Tom. Q1?"]
     r = client.post(f"/interviews/{iid}/practice-again")
     assert r.status_code == 201, r.text
     new = r.json()
@@ -107,12 +107,12 @@ def test_practice_again_gets_a_fresh_persona(client, llm):
 
 def test_persona_voice_is_picked_from_the_list_and_stored(client, llm):
     data = _start(client, llm)
-    assert data["persona_voice"] == "Kore"
+    assert data["persona_voice"] == "coral"
     assert "persona_voice" not in client.get("/interviews").json()[0]
 
     persona_call = llm.calls[0]
-    assert persona_call["json_schema"]["properties"]["voice"]["enum"] == ["Kore", "Aoede", "Leda", "Charon", "Orus", "Puck"]
-    assert "- Puck: upbeat, male-sounding" in persona_call["messages"][0]["content"]
+    assert persona_call["json_schema"]["properties"]["voice"]["enum"] == ["marin", "coral", "sage", "cedar", "ash", "echo"]
+    assert "- ash: firm, male-sounding" in persona_call["messages"][0]["content"]
 
 
 def test_voice_interview_is_stored_and_copied_with_a_fresh_persona_voice(client, llm):
@@ -121,6 +121,6 @@ def test_voice_interview_is_stored_and_copied_with_a_fresh_persona_voice(client,
     iid = _start(client, llm, voice_interview=True)["id"]
     assert client.get(f"/interviews/{iid}").json()["voice_interview"] is True
 
-    llm.responses += [json.dumps({"name": "Tom Berg", "title": "VP Engineering", "voice": "Orus"}), "Hi, I'm Tom. Q1?"]
+    llm.responses += [json.dumps({"name": "Tom Berg", "title": "VP Engineering", "voice": "ash"}), "Hi, I'm Tom. Q1?"]
     again = client.post(f"/interviews/{iid}/practice-again").json()
-    assert (again["voice_interview"], again["persona_voice"]) == (True, "Orus")
+    assert (again["voice_interview"], again["persona_voice"]) == (True, "ash")

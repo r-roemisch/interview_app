@@ -3,7 +3,7 @@ import json
 from interview_app.llm import LLMUnavailable
 from interview_app.prompts.jev_judge import CHECKLIST
 
-PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "Kore"})
+PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "coral"})
 CV = "Led the billing migration at Acme."
 
 

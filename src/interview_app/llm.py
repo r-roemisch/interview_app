@@ -192,7 +192,7 @@ class DevFakeLLMClient:
                 }
             )
         if "invent the interviewer" in system:
-            return json.dumps({"name": "Sam Taylor", "title": "Engineering Manager", "voice": "Orus"})
+            return json.dumps({"name": "Sam Taylor", "title": "Engineering Manager", "voice": "ash"})
         if "extract structured fields" in system:
             return json.dumps({"title": "Software Engineer", "industry": "Software", "seniority": "mid"})
         if "closing message" in last:

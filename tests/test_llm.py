@@ -149,6 +149,6 @@ def test_dev_fake_answers_each_prompt_kind():
     judge = json.loads(fake.complete([{"role": "system", "content": "You are an experienced hiring manager"}, {"role": "user", "content": "CANDIDATE (answer 1): x\n\nCANDIDATE (answer 2): y"}]))
     assert len(judge["answers"]) == 2 and judge["verdict"] == "hire"
     persona = json.loads(fake.complete([{"role": "system", "content": "You invent the interviewer"}, {"role": "user", "content": "Job: x"}]))
-    assert persona == {"name": "Sam Taylor", "title": "Engineering Manager", "voice": "Orus"}
+    assert persona == {"name": "Sam Taylor", "title": "Engineering Manager", "voice": "ash"}
     rec = json.loads(fake.complete([{"role": "system", "content": "You extract structured fields"}, {"role": "user", "content": "jd"}]))
     assert rec["seniority"] == "mid"

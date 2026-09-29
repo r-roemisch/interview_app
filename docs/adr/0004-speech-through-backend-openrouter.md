@@ -6,3 +6,4 @@ In a Voice Interview, the browser records the Answer and sends it to FastAPI, wh
 
 - No live text while speaking: the Answer is transcribed after recording stops, then edited and sent by the candidate.
 - No audio is stored; speech is generated on request and transcriptions become ordinary text Answers.
+- Which models do the speaking and transcribing: ADR-0005.

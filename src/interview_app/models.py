@@ -16,17 +16,17 @@ QUESTION_CAP = 10
 DEFAULT_PERSONA_NAME = "Alex Morgan"
 DEFAULT_PERSONA_TITLE = "Hiring Manager"
 
-# The voices a Persona can speak with in a Voice Interview (Gemini TTS voices, see TTS_MODEL),
+# The voices a Persona can speak with in a Voice Interview (OpenAI voices of TTS_MODEL),
 # each with a description so the Persona call can pick one that fits the name (spec: voice-interview).
 PERSONA_VOICES = {
-    "Kore": "firm, female-sounding",
-    "Aoede": "breezy, female-sounding",
-    "Leda": "youthful, female-sounding",
-    "Charon": "informative, male-sounding",
-    "Orus": "firm, male-sounding",
-    "Puck": "upbeat, male-sounding",
+    "marin": "clear, female-sounding",
+    "coral": "warm, female-sounding",
+    "sage": "calm, female-sounding",
+    "cedar": "clear, male-sounding",
+    "ash": "firm, male-sounding",
+    "echo": "calm, male-sounding",
 }
-DEFAULT_PERSONA_VOICE = "Charon"
+DEFAULT_PERSONA_VOICE = "cedar"
 
 
 class Seniority(StrEnum):

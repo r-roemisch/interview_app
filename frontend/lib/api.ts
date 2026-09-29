@@ -133,7 +133,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
-/** mp3 of an interviewer message in the Persona's voice; used directly as an <audio> source. */
+/** WAV of an interviewer message in the Persona's voice; used directly as an <audio> source. */
 export const speechUrl = (interviewId: number, messageId: number) =>
   `${API_URL}/interviews/${interviewId}/messages/${messageId}/speech`;
 
@@ -152,7 +152,7 @@ export const api = {
     return request<{ text: string }>("/extract-text", { method: "POST", body: form });
   },
 
-  // A recorded Answer as text. The backend reads the format from the Blob's type (e.g. audio/webm).
+  // A recorded Answer as text. The backend reads the format from the Blob's type (audio/wav, see lib/wav.ts).
   transcribe: (audio: Blob) => {
     const form = new FormData();
     form.append("file", audio, "answer");

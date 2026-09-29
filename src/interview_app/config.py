@@ -13,8 +13,9 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     llm_model: str = "google/gemma-4-31b-it:free"
     jev_model: str = "typesafe/jev-1.13"
-    stt_model: str = "openai/gpt-4o-mini-transcribe"
-    tts_model: str = "google/gemini-3.8-flash-tts"
+    # Voice Interviews: an audio chat model for both directions (ADR-0005)
+    stt_model: str = "openai/gpt-audio-mini"
+    tts_model: str = "openai/gpt-audio-mini"
     database_url: str = "sqlite:///./interview.db"
     cors_origins: str = "http://localhost:3000"
 

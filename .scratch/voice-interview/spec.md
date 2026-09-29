@@ -1,7 +1,7 @@
 # Voice Interview: spec
 
 Status: resolved
-Confirmed by the user on 2026-09-28 after a grilling session. Build order: last, after `cv-and-pdf-upload` and `judge-choice`. Vocabulary in `CONTEXT.md` (Voice Interview, Answer, Persona). Decision record: ADR-0004. Extends `.scratch/interview-practice/spec.md`.
+Confirmed by the user on 2026-09-28 after a grilling session. Build order: last, after `cv-and-pdf-upload` and `judge-choice`. Vocabulary in `CONTEXT.md` (Voice Interview, Answer, Persona). Decision records: ADR-0004, ADR-0005. Extends `.scratch/interview-practice/spec.md`.
 
 ## Purpose
 
@@ -13,14 +13,14 @@ Rehearse out loud. The interviewer speaks its Questions and the Closing, the can
 
 ## Persona voice
 
-- Every Persona gets one voice from a fixed list of 6 Gemini TTS voices, each with a one-line description so the voice can fit the Persona's name.
+- Every Persona gets one voice from a fixed list of 6 OpenAI voices of the audio model, each with a one-line description so the voice can fit the Persona's name.
 - The Persona call returns the voice together with name and title (an enum in its JSON schema). The fallback Persona "Alex Morgan, Hiring Manager" has a fixed voice. An unknown voice in the reply counts as a failed Persona call (fallback).
 - Stored for every Interview (harmless for written ones). "Practice again" gets a fresh Persona and voice, as today.
 - The voice decides who is speaking, never how: no tone instructions from Difficulty go to TTS.
 
 ## The interviewer speaks
 
-- Text-to-speech through OpenRouter, model `google/gemini-3.8-flash-tts`, mp3 output, the Persona's voice. (OpenAI's TTS models are not on OpenRouter; the user chose Gemini 3.8 Flash TTS on 2026-09-29.)
+- Text-to-speech through OpenRouter with the audio chat model `openai/gpt-audio-mini`, prompted to read the text word for word, the Persona's voice, WAV output (ADR-0005). A reading whose transcript does not match the text is retried once, then counts as a failed speech request. (The dedicated TTS and transcription models are not on the user's allow-list; the user chose `gpt-audio-mini` on 2026-09-29.)
 - Each new Question and the Closing play automatically when they arrive. Every interviewer message has a replay button.
 - The Question text is always shown, as in a written Interview.
 - A "Mute interviewer" toggle on the Interview page stops automatic playback. It is not stored; a page reload unmutes.
@@ -30,8 +30,8 @@ Rehearse out loud. The interviewer speaks its Questions and the Closing, the can
 ## The candidate speaks
 
 - A mic button next to the Answer box: click to start recording, click to stop. A visible recording indicator and elapsed time.
-- The browser records with `MediaRecorder`, choosing a format with `isTypeSupported` (webm/opus, else mp4).
-- On stop, the audio is sent to the backend, which transcribes it through OpenRouter, model `openai/gpt-4o-mini-transcribe`. The text is added to the Answer box (appended if the box already has text) and the candidate edits it and presses send. Nothing is sent automatically.
+- The browser records with `MediaRecorder`, choosing a format with `isTypeSupported` (webm/opus, else mp4), and converts the recording to 16 kHz mono WAV before sending it, because the model cannot read webm or mp4.
+- On stop, the audio is sent to the backend, which transcribes it through OpenRouter with `openai/gpt-audio-mini`, prompted to write down only what was said. Silence becomes empty text. The text is added to the Answer box (appended if the box already has text) and the candidate edits it and presses send. Nothing is sent automatically.
 - The Answer box and send button work exactly as in a written Interview, so typing is always possible.
 - Mic permission denied or no mic: show a short message by the mic button; typing still works.
 - Transcription fails: an error by the mic button; record again or type.
@@ -46,8 +46,8 @@ Rehearse out loud. The interviewer speaks its Questions and the Closing, the can
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/interviews` | adds `voice_interview`: bool, default false |
-| GET | `/interviews/{id}/messages/{message_id}/speech` | `audio/mpeg` for a Question or Closing, in the Persona's voice; 404 for an Answer; 503 if TTS fails |
-| POST | `/transcriptions` | multipart `file` (audio) → `{text}`; 422 for unsupported format or too large; 503 if transcription fails |
+| GET | `/interviews/{id}/messages/{message_id}/speech` | `audio/wav` for a Question or Closing, in the Persona's voice; 404 for an Answer; 503 if TTS fails |
+| POST | `/transcriptions` | multipart `file` (WAV or mp3) → `{text}`; 422 for unsupported format or too large; 503 if transcription fails |
 
 `InterviewOut` adds `voice_interview` and `persona_voice`.
 
@@ -59,15 +59,15 @@ Rehearse out loud. The interviewer speaks its Questions and the Closing, the can
 
 ## Config
 
-- `STT_MODEL`, default `openai/gpt-4o-mini-transcribe`. `TTS_MODEL`, default `google/gemini-3.8-flash-tts`.
-- `LLM_PROVIDER=fake` also fakes both: TTS returns a short silent mp3, STT returns a fixed sentence.
-- README: the user must add both model ids to the OpenRouter allow-list. The blocked-model error message from `judge-choice` covers these models too.
+- `STT_MODEL` and `TTS_MODEL`, both default `openai/gpt-audio-mini`. Both must be audio chat models (ADR-0005).
+- `LLM_PROVIDER=fake` also fakes both: TTS returns a short silent WAV, STT returns a fixed sentence.
+- README: the model must be on the OpenRouter allow-list (`gpt-audio-mini` is, checked 2026-09-29). The blocked-model error message from `judge-choice` covers it too.
 
 ## Tests
 
 Backend with fake speech clients:
 - Persona call returns a voice from the list; unknown voice → fallback Persona with its fixed voice; practice again gets a fresh voice and copies `voice_interview`.
-- Speech endpoint uses the Persona's voice, returns `audio/mpeg`, 404 for an Answer, 503 when TTS fails.
+- Speech endpoint uses the Persona's voice, returns `audio/wav`, 404 for an Answer, 503 when TTS fails. A reading that does not match the text is refused.
 - Transcription endpoint returns the fake text, rejects oversized or unsupported files, 503 on failure.
 - A Voice Interview's Answers and Evaluation behave exactly like a written Interview's.
 

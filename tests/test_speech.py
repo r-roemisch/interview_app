@@ -1,4 +1,8 @@
+import base64
 import json
+import wave
+from io import BytesIO
+from types import SimpleNamespace
 
 import httpx
 import openai
@@ -6,9 +10,9 @@ import pytest
 
 from interview_app.llm import LLMUnavailable
 from interview_app.routers.speech import MAX_AUDIO_BYTES
-from interview_app.speech import DevFakeSpeechClient, OpenRouterSpeechClient
+from interview_app.speech import SAMPLE_RATE, DevFakeSpeechClient, OpenRouterSpeechClient
 
-PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "Kore"})
+PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "coral"})
 
 
 def _start(client, llm) -> dict:
@@ -21,9 +25,9 @@ def test_question_is_spoken_in_the_persona_voice(client, llm, speech):
     question = iv["messages"][0]
     r = client.get(f"/interviews/{iv['id']}/messages/{question['id']}/speech")
     assert r.status_code == 200
-    assert r.headers["content-type"] == "audio/mpeg"
+    assert r.headers["content-type"] == "audio/wav"
     assert r.content == speech.audio
-    assert speech.calls == [{"speak": "Hi, I'm Priya. First question?", "voice": "Kore"}]
+    assert speech.calls == [{"speak": "Hi, I'm Priya. First question?", "voice": "coral"}]
 
 
 def test_answers_and_other_interviews_messages_are_not_spoken(client, llm):
@@ -43,53 +47,105 @@ def test_speech_failure_is_503(client, llm, speech):
 
 
 @pytest.mark.parametrize(
-    ("content_type", "filename"),
-    [("audio/webm;codecs=opus", "answer.webm"), ("audio/mp4", "answer.m4a"), ("audio/ogg", "answer.ogg")],
+    ("content_type", "audio_format"),
+    [("audio/wav", "wav"), ("audio/x-wav", "wav"), ("audio/mpeg", "mp3")],
 )
-def test_transcription_returns_text_and_names_the_format(client, speech, content_type, filename):
+def test_transcription_returns_text_and_names_the_format(client, speech, content_type, audio_format):
     r = client.post("/transcriptions", files={"file": ("blob", b"audio bytes", content_type)})
     assert r.status_code == 200, r.text
     assert r.json() == {"text": "I led the migration."}
-    assert speech.calls[-1] == {"transcribe": filename, "content_type": content_type.split(";")[0], "size": 11}
+    assert speech.calls[-1] == {"transcribe": audio_format, "size": 11}
 
 
 def test_transcription_rejects_other_formats_and_large_files(client):
-    r = client.post("/transcriptions", files={"file": ("a.txt", b"hello", "text/plain")})
-    assert (r.status_code, r.json()["detail"]) == (422, "This audio format is not supported.")
-    r = client.post("/transcriptions", files={"file": ("a.webm", b"0" * (MAX_AUDIO_BYTES + 1), "audio/webm")})
+    # The model cannot read the browser's own recording formats; the frontend sends WAV.
+    for content_type in ("text/plain", "audio/webm;codecs=opus"):
+        r = client.post("/transcriptions", files={"file": ("a", b"hello", content_type)})
+        assert (r.status_code, r.json()["detail"]) == (422, "This audio format is not supported.")
+    r = client.post("/transcriptions", files={"file": ("a.wav", b"0" * (MAX_AUDIO_BYTES + 1), "audio/wav")})
     assert (r.status_code, r.json()["detail"]) == (422, "The recording is larger than 25 MB.")
 
 
 def test_transcription_failure_is_503(client, speech):
     speech.error = LLMUnavailable("down")
-    r = client.post("/transcriptions", files={"file": ("a.webm", b"x", "audio/webm")})
+    r = client.post("/transcriptions", files={"file": ("a.wav", b"x", "audio/wav")})
     assert r.status_code == 503
 
 
-def test_openrouter_client_calls_the_audio_endpoints_with_retries(monkeypatch):
-    client = OpenRouterSpeechClient("key", tts_model="tts/model", stt_model="stt/model", sleep=lambda s: None)
-    seen = {}
+def _client() -> OpenRouterSpeechClient:
+    return OpenRouterSpeechClient("key", tts_model="tts/model", stt_model="stt/model", sleep=lambda s: None)
+
+
+def _chunks(pcm: bytes, transcript: str) -> list:
+    """A streamed audio reply as the SDK yields it: `audio` is a plain dict on the delta."""
+    half = len(pcm) // 2
+    parts = [(pcm[:half], transcript[:5]), (pcm[half:], transcript[5:])]
+    chunks = [
+        SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(audio={"data": base64.b64encode(d).decode(), "transcript": t}))])
+        for d, t in parts
+    ]
+    return [*chunks, SimpleNamespace(choices=[])]  # the last chunk carries only usage
+
+
+def test_speak_streams_pcm_from_the_audio_model_and_returns_wav(monkeypatch):
+    client = _client()
+    calls = []
     failures = [openai.APIConnectionError(request=httpx.Request("POST", "http://x"))]
 
-    def fake_speech(**kwargs):
+    def fake_create(**kwargs):
+        calls.append(kwargs)
         if failures:
             raise failures.pop()
-        seen["speech"] = kwargs
-        return type("R", (), {"content": b"mp3"})()
+        return iter(_chunks(b"\x01\x00" * 100, "Why do you want this job?"))
 
-    def fake_transcription(**kwargs):
-        seen["transcription"] = kwargs
-        return type("R", (), {"text": "  hello  "})()
+    monkeypatch.setattr(client._client.chat.completions, "create", fake_create)
+    audio = client.speak("Why do you want this job?", "coral")
 
-    monkeypatch.setattr(client._client.audio.speech, "create", fake_speech)
-    monkeypatch.setattr(client._client.audio.transcriptions, "create", fake_transcription)
-    assert client.speak("Hi", "Kore") == b"mp3"
-    assert seen["speech"] == {"model": "tts/model", "voice": "Kore", "input": "Hi", "response_format": "mp3"}
-    assert client.transcribe(b"abc", "answer.webm", "audio/webm") == "hello"
-    assert seen["transcription"] == {"model": "stt/model", "file": ("answer.webm", b"abc", "audio/webm")}
+    with wave.open(BytesIO(audio)) as w:
+        assert (w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()) == (1, 2, SAMPLE_RATE, 100)
+    assert len(calls) == 2  # a connection error is retried
+    kwargs = calls[-1]
+    assert (kwargs["model"], kwargs["stream"], kwargs["modalities"]) == ("tts/model", True, ["text", "audio"])
+    assert kwargs["audio"] == {"voice": "coral", "format": "pcm16"}
+    assert kwargs["messages"][-1] == {"role": "user", "content": 'Say exactly: "Why do you want this job?"'}
 
 
-def test_dev_fake_speaks_mp3_frames_and_transcribes_a_sentence():
+def test_speak_refuses_a_reply_that_answers_instead_of_reading(monkeypatch):
+    client = _client()
+    replies = [_chunks(b"\x00\x00", "Well, I have always loved building products."), _chunks(b"\x00\x00", "Sure. Why do you want this job?")]
+    monkeypatch.setattr(client._client.chat.completions, "create", lambda **kw: iter(replies.pop(0)))
+    assert client.speak("Why do you want this job?", "coral")[:4] == b"RIFF"  # second try is close enough
+
+    replies = [_chunks(b"\x00\x00", "I would love to."), _chunks(b"\x00\x00", "Great question!")]
+    with pytest.raises(LLMUnavailable, match="did not read the text"):
+        client.speak("Why do you want this job?", "coral")
+
+
+def test_transcribe_sends_the_recording_to_the_audio_model(monkeypatch):
+    client = _client()
+    seen = {}
+
+    def fake_create(**kwargs):
+        seen.update(kwargs)
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="  I led the migration.  "))])
+
+    monkeypatch.setattr(client._client.chat.completions, "create", fake_create)
+    assert client.transcribe(b"abc", "wav") == "I led the migration."
+    assert seen["model"] == "stt/model"
+    text, recording = seen["messages"][-1]["content"]
+    assert text["type"] == "text"  # the instruction comes before the audio
+    assert recording == {"type": "input_audio", "input_audio": {"data": base64.b64encode(b"abc").decode(), "format": "wav"}}
+
+
+def test_transcribe_turns_the_silence_marker_into_an_empty_answer(monkeypatch):
+    client = _client()
+    reply = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="[silence]"))])
+    monkeypatch.setattr(client._client.chat.completions, "create", lambda **kw: reply)
+    assert client.transcribe(b"abc", "wav") == ""
+
+
+def test_dev_fake_speaks_silent_wav_and_transcribes_a_sentence():
     fake = DevFakeSpeechClient()
-    assert fake.speak("Hi", "Kore")[:2] == b"\xff\xfb"
-    assert fake.transcribe(b"", "answer.webm", "audio/webm").endswith("percent.")
+    with wave.open(BytesIO(fake.speak("Hi", "coral"))) as w:
+        assert w.getframerate() == SAMPLE_RATE and w.getnframes() > 0
+    assert fake.transcribe(b"", "wav").endswith("percent.")

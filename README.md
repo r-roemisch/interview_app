@@ -39,7 +39,7 @@ The frontend is a thin client. Every page is a client component and all logic, i
 
 Each Interview is scored by the Judge chosen on Setup: the LLM Judge, which writes feedback, or the JEV Judge, which only rates and gives its confidence (ADR-0003). The Evaluation page can run the other Judge on the same transcript and show both side by side.
 
-A Voice Interview (chosen on Setup) reads every Question and the Closing aloud in the Persona's voice (`TTS_MODEL`) and adds a mic button to the Answer box: the recording is transcribed (`STT_MODEL`) into the box, where you edit it and send it like a typed Answer. No audio is stored (ADR-0004). The mic works on http://localhost without HTTPS.
+A Voice Interview (chosen on Setup) reads every Question and the Closing aloud in the Persona's voice (`TTS_MODEL`) and adds a mic button to the Answer box: the recording is transcribed (`STT_MODEL`) into the box, where you edit it and send it like a typed Answer. No audio is stored (ADR-0004). Both directions use the audio chat model `openai/gpt-audio-mini`, prompted to read a text word for word or to write down a recording; the browser converts each recording to WAV first (ADR-0005). The mic works on http://localhost without HTTPS.
 
 ## Prerequisites
 
@@ -87,8 +87,8 @@ Backend, in `.env` at the repo root:
 | Variable | Default | Meaning |
 |---|---|---|
 | `JEV_MODEL` | `typesafe/jev-1.13` | OpenRouter id of JEV, used by the JEV Judge. Keep it pinned: JEV's confidence values only mean something for one version |
-| `STT_MODEL` | `openai/gpt-4o-mini-transcribe` | Transcribes spoken Answers in a Voice Interview. Must be on your OpenRouter allow-list |
-| `TTS_MODEL` | `google/gemini-3.8-flash-tts` | The interviewer's voice in a Voice Interview. Must be on your allow-list. The Persona voices in `models.py` are this model's voices |
+| `STT_MODEL` | `openai/gpt-audio-mini` | Transcribes spoken Answers in a Voice Interview. Must be an audio chat model on your OpenRouter allow-list (ADR-0005) |
+| `TTS_MODEL` | `openai/gpt-audio-mini` | The interviewer's voice in a Voice Interview. Must be an audio chat model on your allow-list. The Persona voices in `models.py` are this model's voices |
 | `LLM_PROVIDER` | `openrouter` | `openrouter` for real calls, `fake` for an offline scripted interviewer and judge |
 | `OPENROUTER_API_KEY` | empty | Required when `LLM_PROVIDER=openrouter` |
 | `LLM_MODEL` | `google/gemma-4-31b-it:free` | Any OpenRouter model id. Free ones are listed at https://openrouter.ai/models?q=free |
@@ -150,6 +150,7 @@ tests/              pytest suite
 frontend/
   app/              pages (all "use client"), layout, nav, shared ui
   lib/api.ts        typed client for the backend
+  lib/wav.ts        converts a recording to WAV for transcription
 docs/adr/           architecture decisions
 .scratch/           spec and implementation issues
 ```

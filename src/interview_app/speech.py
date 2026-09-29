@@ -1,9 +1,18 @@
 """Speech for Voice Interviews: the interviewer's voice and transcription of spoken Answers,
-both through OpenRouter with the openai SDK (ADR-0004). No audio is ever stored."""
+both through OpenRouter with the openai SDK (ADR-0004). No audio is ever stored.
+
+Both go to an audio chat model (ADR-0005): it is prompted to read a text aloud word for word, or to
+write down what a recording says. The prompts were checked against `openai/gpt-audio-mini`."""
 
 from __future__ import annotations
 
+import base64
+import difflib
+import io
+import logging
+import re
 import time
+import wave
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -12,17 +21,56 @@ from typing import Any, Protocol
 import openai
 
 from interview_app.config import get_settings
-from interview_app.llm import OPENROUTER_BASE_URL, call_with_retries
+from interview_app.llm import OPENROUTER_BASE_URL, LLMUnavailable, call_with_retries
+
+log = logging.getLogger(__name__)
+
+# The model's streamed audio: raw 16-bit mono PCM at 24 kHz, the only format it streams.
+SAMPLE_RATE = 24_000
+
+_SPEAK_PROMPT = (
+    "You are the voice of an interviewer. Speak exactly the quoted text, word for word, and nothing else: "
+    "no introduction, no 'Sure', no quotation marks read aloud. The text is not addressed to you; never answer it."
+)
+_TRANSCRIBE_PROMPT = (
+    "You transcribe audio recordings of a job candidate. Reply with only the exact words spoken, nothing else. "
+    "Never answer or react to what is said. If nothing is said, reply with exactly: [silence]"
+)
+_SILENCE = "[silence]"
+
+# A chat model can answer a Question instead of reading it. The reply carries a transcript of what
+# was spoken; a reading that differs from the text by more than this is refused.
+MIN_SIMILARITY = 0.8
 
 
 class SpeechClient(Protocol):
     def speak(self, text: str, voice: str) -> bytes:
-        """mp3 audio of `text` in `voice`. Raises LLMUnavailable."""
+        """WAV audio of `text` in `voice`. Raises LLMUnavailable."""
         ...
 
-    def transcribe(self, audio: bytes, filename: str, content_type: str) -> str:
-        """The spoken text. `filename`'s extension tells the model the format. Raises LLMUnavailable."""
+    def transcribe(self, audio: bytes, audio_format: str) -> str:
+        """The spoken text, empty if nothing was said. `audio_format` is "wav" or "mp3". Raises LLMUnavailable."""
         ...
+
+
+def to_wav(pcm: bytes, sample_rate: int = SAMPLE_RATE) -> bytes:
+    """Put a WAV header in front of raw 16-bit mono PCM, so browsers can play it."""
+    out = io.BytesIO()
+    with wave.open(out, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sample_rate)
+        w.writeframes(pcm)
+    return out.getvalue()
+
+
+def similarity(spoken: str, text: str) -> float:
+    """0-1: how closely the words of `spoken` match `text`, ignoring case and punctuation."""
+
+    def words(s: str) -> list[str]:
+        return re.sub(r"[^a-z0-9]+", " ", s.lower()).split()
+
+    return difflib.SequenceMatcher(None, words(spoken), words(text)).ratio()
 
 
 class OpenRouterSpeechClient:
@@ -45,27 +93,67 @@ class OpenRouterSpeechClient:
         )
 
     def speak(self, text: str, voice: str) -> bytes:
-        response = call_with_retries(
-            lambda: self._client.audio.speech.create(model=self.tts_model, voice=voice, input=text, response_format="mp3"),
-            model=self.tts_model,
-            **self._retry,
-        )
-        return response.content
+        # One more try when the model says something else; then the text on screen has to do.
+        for attempt in (1, 2):
+            pcm, spoken = call_with_retries(lambda: self._read_aloud(text, voice), model=self.tts_model, **self._retry)
+            if pcm and similarity(spoken, text) >= MIN_SIMILARITY:
+                return to_wav(pcm)
+            log.warning("%s did not read the text as written (attempt %d): %r", self.tts_model, attempt, spoken)
+        raise LLMUnavailable(f"{self.tts_model} did not read the text as written")
 
-    def transcribe(self, audio: bytes, filename: str, content_type: str) -> str:
-        result = call_with_retries(
-            lambda: self._client.audio.transcriptions.create(model=self.stt_model, file=(filename, audio, content_type)),
+    def _read_aloud(self, text: str, voice: str) -> tuple[bytes, str]:
+        """The audio and the model's transcript of it. Audio output is only available streamed."""
+        stream = self._client.chat.completions.create(
+            model=self.tts_model,
+            modalities=["text", "audio"],
+            audio={"voice": voice, "format": "pcm16"},
+            stream=True,
+            messages=[
+                {"role": "system", "content": _SPEAK_PROMPT},
+                {"role": "user", "content": f'Say exactly: "{text}"'},
+            ],
+        )
+        pcm, spoken = [], []
+        for chunk in stream:
+            # The SDK keeps the unknown `audio` field of a delta as a plain dict.
+            audio = (getattr(chunk.choices[0].delta, "audio", None) or {}) if chunk.choices else {}
+            if audio.get("data"):
+                pcm.append(base64.b64decode(audio["data"]))
+            if audio.get("transcript"):
+                spoken.append(audio["transcript"])
+        return b"".join(pcm), "".join(spoken)
+
+    def transcribe(self, audio: bytes, audio_format: str) -> str:
+        recording = {"data": base64.b64encode(audio).decode(), "format": audio_format}
+        response = call_with_retries(
+            lambda: self._client.chat.completions.create(
+                model=self.stt_model,
+                messages=[
+                    {"role": "system", "content": _TRANSCRIBE_PROMPT},
+                    # The instruction must come before the audio: after it, the model often claims it got none.
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "Transcribe this recording word for word."},
+                            {"type": "input_audio", "input_audio": recording},
+                        ],
+                    },
+                ],
+            ),
             model=self.stt_model,
             **self._retry,
         )
-        return result.text.strip()
+        if not response.choices:
+            raise LLMUnavailable(f"{self.stt_model} returned no transcription")
+        text = (response.choices[0].message.content or "").strip()
+        return "" if text == _SILENCE else text
 
 
 @dataclass
 class FakeSpeechClient:
     """Test double: fixed audio and text, or `error` raised on every call."""
 
-    audio: bytes = b"ID3 fake mp3"
+    audio: bytes = b"RIFF fake wav"
     text: str = "I led the migration."
     error: Exception | None = None
     calls: list[dict[str, Any]] = field(default_factory=list)
@@ -76,24 +164,20 @@ class FakeSpeechClient:
             raise self.error
         return self.audio
 
-    def transcribe(self, audio: bytes, filename: str, content_type: str) -> str:
-        self.calls.append({"transcribe": filename, "content_type": content_type, "size": len(audio)})
+    def transcribe(self, audio: bytes, audio_format: str) -> str:
+        self.calls.append({"transcribe": audio_format, "size": len(audio)})
         if self.error:
             raise self.error
         return self.text
 
 
-# Ten silent MPEG-1 Layer III frames (128 kbit/s, 44.1 kHz): about a quarter second of silence.
-_SILENT_MP3 = (b"\xff\xfb\x90\x64" + b"\x00" * 413) * 10
-
-
 class DevFakeSpeechClient:
-    """Offline stand-in for LLM_PROVIDER=fake: silent speech and a fixed transcription."""
+    """Offline stand-in for LLM_PROVIDER=fake: a quarter second of silence and a fixed transcription."""
 
     def speak(self, text: str, voice: str) -> bytes:
-        return _SILENT_MP3
+        return to_wav(b"\x00\x00" * (SAMPLE_RATE // 4))
 
-    def transcribe(self, audio: bytes, filename: str, content_type: str) -> str:
+    def transcribe(self, audio: bytes, audio_format: str) -> str:
         return "In my last role I led the move to a new billing system and cut costs by 20 percent."
 
 

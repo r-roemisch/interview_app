@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api, ApiError, speechUrl, type Interview, type Message } from "@/lib/api";
 import { DIFFICULTY_OPTIONS, SENIORITY_OPTIONS, STAR_PARTS } from "@/lib/labels";
+import { toWav } from "@/lib/wav";
 import { Button, ErrorBanner, Page, PersonaAvatar, Spinner, StarLetter } from "../../ui";
 
 type EvaluationState = "polling" | "ready" | "missing";
@@ -586,13 +587,13 @@ function useRecorder(onTranscript: (text: string) => void, onStart: () => void) 
     const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     const chunks: Blob[] = [];
     recorder.ondataavailable = (e) => chunks.push(e.data);
-    // Runs after stop(): release the mic, then send the recording for transcription.
+    // Runs after stop(): release the mic, then convert the recording to WAV and send it for transcription.
     recorder.onstop = async () => {
       stream.getTracks().forEach((t) => t.stop()); // also turns off the browser's recording indicator
       recorderRef.current = null;
       setState("transcribing");
       try {
-        const { text } = await api.transcribe(new Blob(chunks, { type: recorder.mimeType }));
+        const { text } = await api.transcribe(await toWav(new Blob(chunks, { type: recorder.mimeType })));
         if (text) onTranscript(text);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : "Could not transcribe the recording. Record again or type.");

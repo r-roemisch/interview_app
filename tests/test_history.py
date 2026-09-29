@@ -2,7 +2,7 @@ import json
 
 from interview_app.models import Evaluation, Interview, Message
 
-PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "Kore"})
+PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "coral"})
 
 
 def _judge_reply(answers: int, score: int) -> str:

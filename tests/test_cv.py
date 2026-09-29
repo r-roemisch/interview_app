@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "Kore"})
+PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "coral"})
 CV = "Led the billing migration at Acme, cutting costs by 30%."
 
 
