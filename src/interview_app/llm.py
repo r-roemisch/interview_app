@@ -59,8 +59,9 @@ _RETRYABLE = (
 def rejection_message(body: Any, model: str, fallback: str) -> str:
     """The provider's error message, or a short one naming the model when the allow-list blocks it."""
     body = body if isinstance(body, dict) else {}
-    err = body.get("error") if isinstance(body.get("error"), dict) else {}
-    message = err.get("message") or fallback
+    # JEV passes OpenRouter's raw {"error": {"message": ...}}; the openai SDK has already unwrapped it.
+    err = body.get("error") if isinstance(body.get("error"), dict) else body
+    message = err.get("message") if isinstance(err.get("message"), str) else fallback
     if "guardrail" in message:
         return f"{model} is not on your OpenRouter allow-list. Add it at {GUARDRAILS_URL}"
     return message
@@ -105,7 +106,8 @@ class OpenRouterClient:
             backoff_seconds=self.backoff_seconds,
             sleep=self._sleep,
         )
-        content = response.choices[0].message.content
+        # OpenRouter sometimes answers 200 with an error body and no `choices`.
+        content = response.choices[0].message.content if response.choices else None
         if not content:
             raise LLMUnavailable("model returned an empty message")
         return content

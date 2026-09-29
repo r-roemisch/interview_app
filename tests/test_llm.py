@@ -61,13 +61,37 @@ def test_non_retryable_error_becomes_unavailable_without_retry(monkeypatch):
     def fake_create(**kwargs):
         attempts.append(1)
         raise openai.NotFoundError(
-            "blocked", response=resp, body={"error": {"message": "Model blocked by guardrail"}}
+            # the SDK hands over the body with OpenRouter's outer "error" already unwrapped
+            "blocked", response=resp, body={"message": "Model blocked by guardrail"}
         )
 
     monkeypatch.setattr(client._client.chat.completions, "create", fake_create)
     with pytest.raises(LLMUnavailable, match="test/model is not on your OpenRouter allow-list"):
         client.complete([{"role": "user", "content": "hi"}])
     assert len(attempts) == 1
+
+
+def test_rejection_shows_the_providers_message(monkeypatch):
+    client = _make_client()
+    resp = httpx.Response(401, request=httpx.Request("POST", "http://x"))
+
+    def fake_create(**kwargs):
+        raise openai.AuthenticationError(
+            "Error code: 401 - {...}", response=resp, body={"message": "No auth credentials found", "code": 401}
+        )
+
+    monkeypatch.setattr(client._client.chat.completions, "create", fake_create)
+    with pytest.raises(LLMUnavailable, match="^No auth credentials found$"):
+        client.complete([{"role": "user", "content": "hi"}])
+
+
+def test_reply_without_choices_is_unavailable(monkeypatch):
+    client = _make_client()
+    reply = _Reply("unused")
+    reply.choices = None  # OpenRouter's 200-with-error-body shape
+    monkeypatch.setattr(client._client.chat.completions, "create", lambda **kw: reply)
+    with pytest.raises(LLMUnavailable):
+        client.complete([{"role": "user", "content": "hi"}])
 
 
 def test_json_schema_is_passed_as_response_format(monkeypatch):

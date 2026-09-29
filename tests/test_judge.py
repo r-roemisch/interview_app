@@ -1,7 +1,11 @@
 import json
 
+from fastapi.testclient import TestClient
+
+from interview_app import db as db_module
 from interview_app.llm import LLMUnavailable
-from interview_app.models import Evaluation, Interview
+from interview_app.main import create_app
+from interview_app.models import Evaluation, Interview, InterviewStatus
 
 PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "Kore"})
 
@@ -128,3 +132,29 @@ def test_evaluation_is_404_while_in_progress_and_rerun_is_409(client, llm):
     iid = client.post("/interviews", json={"title": "PM"}).json()["id"]
     assert client.get(f"/interviews/{iid}/evaluation").status_code == 404
     assert client.post(f"/interviews/{iid}/evaluation/rerun").status_code == 409
+
+
+def test_rerun_is_409_while_the_judge_is_running(client, llm, db):
+    llm.responses.append(_judge_json(1))
+    iid = _finish_early(client, llm, answers=1)
+    db.get(Interview, iid).status = InterviewStatus.JUDGING
+    db.commit()
+    r = client.post(f"/interviews/{iid}/evaluation/rerun")
+    assert r.status_code == 409
+    assert r.json()["detail"] == "The Judge is still running"
+
+
+def test_startup_turns_interrupted_judging_into_evaluation_missing(engine, db, monkeypatch):
+    # A server restart loses the background Judge; without this the Interview stays Judging forever.
+    judging = Interview(title="PM", status=InterviewStatus.JUDGING)
+    in_progress = Interview(title="QA")
+    db.add_all([judging, in_progress])
+    db.commit()
+
+    monkeypatch.setattr(db_module, "engine", engine)
+    with TestClient(create_app()):
+        pass
+
+    db.expire_all()
+    assert db.get(Interview, judging.id).status == InterviewStatus.EVALUATION_MISSING
+    assert db.get(Interview, in_progress.id).status == InterviewStatus.IN_PROGRESS

@@ -78,6 +78,8 @@ cd frontend && npm run dev
 
 Open http://localhost:3000. The dot in the top-right corner turns green when the frontend can reach the backend. API docs are at http://localhost:8000/docs.
 
+The backend reloads whenever a Python file changes. A Judge that was running at that moment is lost, so at startup every Interview still Judging becomes Evaluation Missing; use "Re-run evaluation" on it.
+
 ## Configuration
 
 Backend, in `.env` at the repo root:

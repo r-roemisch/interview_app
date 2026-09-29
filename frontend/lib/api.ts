@@ -118,6 +118,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     try {
       const body = (await response.json()) as { detail?: unknown };
       if (typeof body.detail === "string") detail = body.detail;
+      // FastAPI's own validation errors (422) are a list, e.g.
+      // [{ loc: ["body", "cv"], msg: "String should have at most 20000 characters" }]
+      else if (Array.isArray(body.detail))
+        detail = (body.detail as { loc?: unknown[]; msg?: string }[])
+          .map((d) => `${d.loc?.at(-1) ?? "input"}: ${d.msg}`)
+          .join("; ");
     } catch {
       // non-JSON error body: keep statusText
     }

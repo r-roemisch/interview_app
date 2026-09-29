@@ -30,7 +30,7 @@ class InterviewStateError(Exception):
     """The requested action is not allowed in the Interview's current status."""
 
 
-# Called after a Closing is persisted. Issue 05 registers the Judge here.
+# Called after a Closing is persisted; the router uses it to schedule the Judge.
 JudgeTrigger = Callable[[int], None]
 
 

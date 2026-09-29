@@ -20,7 +20,7 @@ class InterviewCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     industry: str | None = Field(default=None, max_length=200)
     seniority: Seniority = Seniority.MID
-    job_description: str | None = None
+    job_description: str | None = Field(default=None, max_length=20_000)
     difficulty: Difficulty = Difficulty.NORMAL
     cv: str | None = Field(default=None, max_length=20_000)
     judge: Judge = Judge.LLM
@@ -187,8 +187,10 @@ def rerun_evaluation(
     session_factory=Depends(get_session_factory),
     jev: JevClient = Depends(get_jev_client),
 ) -> Interview:
-    if interview.status not in (InterviewStatus.COMPLETED, InterviewStatus.EVALUATION_MISSING):
+    if interview.status == InterviewStatus.IN_PROGRESS:
         raise HTTPException(status.HTTP_409_CONFLICT, "Interview has not ended")
+    if interview.status == InterviewStatus.JUDGING:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The Judge is still running")
     judge.replace_evaluation(db, interview, interview.judge, None)
     interview.status = InterviewStatus.JUDGING
     db.commit()

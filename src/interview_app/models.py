@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from enum import StrEnum
 
-from sqlalchemy import JSON, Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text, TypeDecorator, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from interview_app.db import Base
@@ -74,6 +74,19 @@ def _enum(enum_cls: type[StrEnum]) -> Enum:
     return Enum(enum_cls, native_enum=False, length=32, values_callable=lambda e: [m.value for m in e])
 
 
+class UTCDateTime(TypeDecorator):
+    """SQLite drops the time zone on save. Every stored time is UTC, so put it back on load;
+    otherwise the API sends times without an offset and browsers read them as local time."""
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_result_value(self, value: datetime | None, dialect) -> datetime | None:
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value
+
+
 class Interview(Base):
     __tablename__ = "interviews"
 
@@ -97,7 +110,7 @@ class Interview(Base):
     voice_interview: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[InterviewStatus] = mapped_column(_enum(InterviewStatus), default=InterviewStatus.IN_PROGRESS)
     ended_early: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=_now)
 
     messages: Mapped[list[Message]] = relationship(
         back_populates="interview",
@@ -157,6 +170,6 @@ class Evaluation(Base):
     improvement_points: Mapped[list] = mapped_column(JSON)
     # list[dict] in Answer order, shape = schemas.StarBreakdown (comment None and confidence set for JEV)
     star_breakdowns: Mapped[list] = mapped_column(JSON)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=_now)
 
     interview: Mapped[Interview] = relationship(back_populates="evaluations")

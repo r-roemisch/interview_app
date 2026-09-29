@@ -1,6 +1,6 @@
 # Interview Practice: spec
 
-Status: ready-for-agent
+Status: resolved
 Confirmed by the user on 2026-09-25 after a grilling session; Persona and UI sections added after a second grilling session on 2026-09-28. Vocabulary is defined in `CONTEXT.md`; architecture decisions in `docs/adr/`.
 Extended on 2026-09-28 by `.scratch/cv-and-pdf-upload/spec.md`, `.scratch/judge-choice/spec.md` and `.scratch/voice-interview/spec.md`; where they differ, they win.
 

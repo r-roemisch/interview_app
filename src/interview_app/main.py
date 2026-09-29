@@ -3,15 +3,20 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
+from interview_app import db as db_module
 from interview_app.config import get_settings
 from interview_app.db import create_tables
 from interview_app.routers import cv, extract, interviews, recommend, speech
+from interview_app.services.judge import fail_interrupted_judges
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_tables()
+    with Session(db_module.engine) as db:
+        fail_interrupted_judges(db)
     yield
 
 

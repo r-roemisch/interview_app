@@ -117,5 +117,5 @@ _Avoid_: Tips, suggestions
 ### History
 
 **History**:
-The list of all past Interviews, completed or in progress. A completed Interview opens its Evaluation; an in-progress one can be resumed.
+The list of all past Interviews, whatever their status. An In Progress one can be resumed; any other opens its Evaluation, where an Evaluation Missing one can be re-run.
 _Avoid_: Archive, log, past sessions

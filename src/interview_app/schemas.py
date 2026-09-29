@@ -6,7 +6,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from interview_app.models import Difficulty, InterviewStatus, Judge, MessageRole, Seniority, Verdict
+from interview_app.models import QUESTION_CAP, Difficulty, InterviewStatus, Judge, MessageRole, Seniority, Verdict
 
 
 class MessageOut(BaseModel):
@@ -36,7 +36,7 @@ class InterviewOut(BaseModel):
     ended_early: bool
     created_at: datetime
     question_count: int
-    question_cap: int = 10
+    question_cap: int = QUESTION_CAP
     messages: list[MessageOut]
 
 

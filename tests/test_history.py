@@ -92,3 +92,10 @@ def test_practice_again_copies_job_snapshot_and_difficulty(client, llm):
     original = client.get(f"/interviews/{iid}").json()
     assert original["status"] == "completed"
     assert len(client.get("/interviews").json()) == 2
+
+
+def test_times_are_sent_with_their_utc_offset(client, llm):
+    # SQLite drops the time zone; without it browsers read the time as local.
+    iid = _start(client, llm, "Analyst")
+    assert client.get(f"/interviews/{iid}").json()["created_at"].endswith("Z")
+    assert client.get("/interviews").json()[0]["created_at"].endswith("Z")

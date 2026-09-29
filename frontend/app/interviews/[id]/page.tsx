@@ -67,7 +67,8 @@ export default function InterviewPage() {
   }, [interviewId, reloadKey]);
 
   // Once the Interview has ended, poll for the Evaluation every 2 s until it exists or the Judge
-  // failed. `evaluation` is a dependency so that "Re-run evaluation" starts polling again.
+  // failed (409). Any other failure, e.g. the backend restarting, is just tried again.
+  // `evaluation` is a dependency so that "Re-run evaluation" starts polling again.
   const ended = interview !== null && interview.status !== "in_progress";
   useEffect(() => {
     if (!ended || evaluation !== "polling") return;
@@ -78,8 +79,8 @@ export default function InterviewPage() {
         if (!cancelled) setEvaluation("ready");
       } catch (e) {
         if (cancelled) return;
-        if (e instanceof ApiError && e.status === 404) timer = setTimeout(check, 2000);
-        else setEvaluation("missing");
+        if (e instanceof ApiError && e.status === 409) setEvaluation("missing");
+        else timer = setTimeout(check, 2000);
       }
     };
     let timer = setTimeout(check, 500);
@@ -242,6 +243,8 @@ export default function InterviewPage() {
               personaName={interview.persona_name}
               // A transcription is added to whatever is already in the Answer box.
               onTranscript={interview.voice_interview ? (text) => setDraft((d) => (d.trim() ? `${d.trimEnd()} ${text}` : text)) : undefined}
+              // Otherwise the mic records the interviewer's voice too.
+              onRecordingStart={() => audioRef.current?.pause()}
             />
           ) : (
             <JudgingFooter
@@ -448,6 +451,7 @@ function Composer({
   busy,
   personaName,
   onTranscript,
+  onRecordingStart,
 }: {
   draft: string;
   setDraft: (s: string) => void;
@@ -455,8 +459,11 @@ function Composer({
   busy: boolean;
   personaName: string;
   onTranscript?: (text: string) => void; // set in a Voice Interview: shows the mic button
+  onRecordingStart: () => void;
 }) {
-  const recorder = useRecorder(onTranscript ?? (() => {}));
+  const recorder = useRecorder(onTranscript ?? (() => {}), onRecordingStart);
+  // No sending mid-recording: the transcription would land in the next Answer's box.
+  const sendBlocked = busy || recorder.state !== "idle";
   const hint = busy
     ? `${personaName} is reading your answer.`
     : recorder.state === "recording"
@@ -474,10 +481,11 @@ function Composer({
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
-              onSend();
+              if (!sendBlocked) onSend();
             }
           }}
           disabled={busy}
+          maxLength={10000}
           rows={2}
           placeholder="Describe the situation, what you did, and the result."
           className="max-h-48 min-h-12 flex-1 resize-none bg-transparent px-2 py-1.5 text-[15px] leading-relaxed outline-none field-sizing-content placeholder:text-zinc-400 disabled:opacity-50 dark:placeholder:text-zinc-500"
@@ -506,7 +514,7 @@ function Composer({
         <button
           aria-label="Send answer"
           onClick={onSend}
-          disabled={busy}
+          disabled={sendBlocked}
           className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-600"
         >
           <ArrowUp className="h-4 w-4" />
@@ -556,7 +564,7 @@ function formatSeconds(total: number): string {
 
 // Voice Interview: record an Answer in the browser, then have the backend transcribe it.
 // The text goes into the Answer box for the candidate to check; nothing is sent automatically.
-function useRecorder(onTranscript: (text: string) => void) {
+function useRecorder(onTranscript: (text: string) => void, onStart: () => void) {
   const [state, setState] = useState<"idle" | "recording" | "transcribing">("idle");
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -592,6 +600,7 @@ function useRecorder(onTranscript: (text: string) => void) {
         setState("idle");
       }
     };
+    onStart();
     recorder.start();
     recorderRef.current = recorder;
     setSeconds(0);

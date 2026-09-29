@@ -82,6 +82,7 @@ export default function SetupPage() {
               className={`${inputClass} min-h-36`}
               value={jobDescription}
               onChange={(e) => setJobDescription(e.target.value)}
+              maxLength={20000}
               placeholder="Paste the job posting here"
             />
           </Field>

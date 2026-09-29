@@ -10,6 +10,7 @@ import logging
 from collections.abc import Callable
 
 from pydantic import ValidationError
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from interview_app import db as db_module
@@ -150,3 +151,15 @@ def run_judge_in_background(
             db.commit()
     finally:
         db.close()
+
+
+def fail_interrupted_judges(db: Session) -> None:
+    """Called at startup. A Judge runs as a background task, so a server restart (e.g. the dev
+    server reloading) loses it and its Interview would stay Judging forever. No Judge can be
+    running yet, so every Judging Interview becomes Evaluation Missing and can be re-run."""
+    db.execute(
+        update(Interview)
+        .where(Interview.status == InterviewStatus.JUDGING)
+        .values(status=InterviewStatus.EVALUATION_MISSING)
+    )
+    db.commit()
