@@ -13,7 +13,7 @@ import {
   STAR_PARTS,
   VERDICT_LABEL,
 } from "@/lib/labels";
-import { Button, ErrorBanner, LinkButton, Page, PersonaAvatar, Spinner, StarLetter } from "../../../ui";
+import { Button, cardClass, ErrorBanner, LinkButton, Page, PersonaAvatar, Spinner, StarLetter } from "../../../ui";
 
 const VERDICT_STYLE: Record<Verdict, string> = {
   strong_hire: "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30",
@@ -131,7 +131,7 @@ export default function EvaluationPage() {
       intro={
         <span className="flex flex-wrap gap-1.5">
           {chips.map((chip) => (
-            <span key={chip} className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+            <span key={chip} className="rounded-md bg-white/70 px-1.5 py-0.5 text-xs text-zinc-600 ring-1 ring-zinc-200/70 dark:bg-zinc-800 dark:text-zinc-400 dark:ring-zinc-700/70">
               {chip}
             </span>
           ))}
@@ -142,7 +142,7 @@ export default function EvaluationPage() {
         {error && <ErrorBanner message={error} />}
 
         {state === "judging" && (
-          <div className="rounded-2xl border border-zinc-200 px-5 py-6 dark:border-zinc-800">
+          <div className={`rounded-2xl px-5 py-6 ${cardClass}`}>
             <Spinner label="The judge is scoring your answers..." />
           </div>
         )}
@@ -171,7 +171,7 @@ export default function EvaluationPage() {
               <h2 className="mb-3 text-lg font-semibold">Improve next time</h2>
               <ul className="space-y-2">
                 {evaluation.improvement_points.map((p, i) => (
-                  <li key={i} className="flex gap-3 rounded-xl border border-zinc-200 px-4 py-3 text-[15px] leading-relaxed dark:border-zinc-800">
+                  <li key={i} className={`flex gap-3 rounded-xl px-4 py-3 text-[15px] leading-relaxed ${cardClass}`}>
                     <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />
                     {p}
                   </li>
@@ -184,7 +184,7 @@ export default function EvaluationPage() {
                 <PersonaAvatar name={interview.persona_name} />
                 <div>
                   <h2 className="text-lg font-semibold">Transcript and STAR breakdown</h2>
-                  <p className="text-sm text-zinc-500">
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
                     Questions asked by {interview.persona_name}, {interview.persona_title}
                   </p>
                 </div>
@@ -194,7 +194,7 @@ export default function EvaluationPage() {
           </>
         )}
 
-        <footer className="flex flex-wrap items-center gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+        <footer className="flex flex-wrap items-center gap-3 border-t border-zinc-200/70 pt-6 dark:border-zinc-800/70">
           <Button onClick={practiceAgain} disabled={busy}>
             <RotateCcw className="h-4 w-4" />
             Practice this job again
@@ -214,7 +214,7 @@ export default function EvaluationPage() {
 function ScoreCard({ evaluation }: { evaluation: Evaluation }) {
   const isJev = evaluation.judge === "jev";
   return (
-    <section className="grid gap-6 rounded-2xl border border-zinc-200 bg-zinc-50/60 p-6 sm:grid-cols-[auto_1fr] dark:border-zinc-800 dark:bg-zinc-900/40">
+    <section className={`grid gap-6 rounded-2xl p-6 sm:grid-cols-[auto_1fr] ${cardClass}`}>
       <div className="flex items-center gap-4 sm:flex-col sm:items-start">
         <p className="leading-none">
           <span className="text-6xl font-semibold tracking-tight tabular-nums">{evaluation.overall_score}</span>
@@ -229,7 +229,7 @@ function ScoreCard({ evaluation }: { evaluation: Evaluation }) {
         </span>
       </div>
       <div>
-        <p className="mb-2 flex items-center gap-1.5 text-sm font-medium text-zinc-500">
+        <p className="mb-2 flex items-center gap-1.5 text-sm font-medium text-zinc-600 dark:text-zinc-400">
           <Scale className="h-4 w-4" />
           {JUDGE_LABEL[evaluation.judge]} Judge
         </p>
@@ -239,7 +239,7 @@ function ScoreCard({ evaluation }: { evaluation: Evaluation }) {
               <span className="font-medium text-zinc-900 dark:text-zinc-100">How the JEV Judge works. </span>
               {JEV_EXPLANATION}
             </p>
-            <p className="mt-3 flex flex-wrap gap-3 text-xs text-zinc-500">
+            <p className="mt-3 flex flex-wrap gap-3 text-xs text-zinc-600 dark:text-zinc-400">
               {(["high", "medium", "low"] as const).map((level) => (
                 <span key={level} className="flex items-center gap-1.5">
                   <span className={`h-2 w-2 rounded-full ${CONFIDENCE_DOT[level]}`} />
@@ -291,9 +291,9 @@ function Transcript({
         }
         const breakdown = byPosition.get(m.position);
         return (
-          <li key={m.id} className="ml-8 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-            <p className="whitespace-pre-wrap bg-zinc-100 px-4 py-3 text-[15px] leading-relaxed dark:bg-zinc-800/80">
-              {m.text || <em className="text-zinc-500">(no answer given)</em>}
+          <li key={m.id} className={`ml-8 overflow-hidden rounded-xl ${cardClass}`}>
+            <p className="whitespace-pre-wrap bg-zinc-50 px-4 py-3 text-[15px] leading-relaxed dark:bg-zinc-800/60">
+              {m.text || <em className="text-zinc-600 dark:text-zinc-400">(no answer given)</em>}
             </p>
             {breakdown && <StarRows breakdown={breakdown} />}
           </li>
@@ -386,9 +386,9 @@ function Comparison({ chosen, other }: { chosen: Evaluation; other: Evaluation }
   return (
     <section>
       <h2 className="mb-3 text-lg font-semibold">Judges compared</h2>
-      <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+      <div className={`overflow-x-auto rounded-xl ${cardClass}`}>
         <table className="w-full text-sm">
-          <thead className="bg-zinc-50 text-left text-zinc-500 dark:bg-zinc-900/60">
+          <thead className="bg-zinc-50 text-left text-zinc-600 dark:text-zinc-400 dark:bg-zinc-900/60">
             <tr>
               <th className="px-4 py-2 font-medium" />
               {cols.map((e, i) => (
@@ -400,20 +400,20 @@ function Comparison({ chosen, other }: { chosen: Evaluation; other: Evaluation }
           </thead>
           <tbody className="divide-y divide-zinc-100 tabular-nums dark:divide-zinc-800">
             <tr>
-              <td className="px-4 py-2 text-zinc-500">Overall score</td>
+              <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">Overall score</td>
               {cols.map((e) => (
                 <td key={e.judge} className="px-4 py-2 text-base font-semibold">{e.overall_score}</td>
               ))}
             </tr>
             <tr>
-              <td className="px-4 py-2 text-zinc-500">Verdict</td>
+              <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">Verdict</td>
               {cols.map((e) => (
                 <td key={e.judge} className="px-4 py-2">{VERDICT_LABEL[e.verdict]}</td>
               ))}
             </tr>
             {chosen.star_breakdowns.map((b, i) => (
               <tr key={b.position}>
-                <td className="px-4 py-2 text-zinc-500">Answer {i + 1}</td>
+                <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">Answer {i + 1}</td>
                 {cols.map((e) => (
                   <td key={e.judge} className="px-4 py-2 font-mono text-xs">
                     {e.star_breakdowns[i] ? stars(e.star_breakdowns[i]) : "-"}

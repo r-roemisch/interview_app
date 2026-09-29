@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, ApiError, type HistoryRow } from "@/lib/api";
 import { formatDate, JUDGE_LABEL, STATUS_LABEL } from "@/lib/labels";
-import { ErrorBanner, LinkButton, Page, Spinner, StatusBadge } from "../ui";
+import { cardClass, ErrorBanner, LinkButton, Page, Spinner, StatusBadge } from "../ui";
 
 // History page: every past Interview. Each row opens the right page for its status.
 export default function HistoryPage() {
@@ -56,15 +56,15 @@ export default function HistoryPage() {
         {!rows && !error && <Spinner label="Loading..." />}
 
         {rows && rows.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-zinc-300 px-6 py-12 text-center dark:border-zinc-700">
+          <div className="rounded-2xl border border-dashed border-zinc-300 bg-white/50 px-6 py-12 text-center dark:border-zinc-700 dark:bg-zinc-900/40">
             <p className="font-medium">No interviews yet</p>
-            <p className="mt-1 mb-5 text-sm text-zinc-500">Your finished and unfinished interviews will be listed here.</p>
+            <p className="mt-1 mb-5 text-sm text-zinc-600 dark:text-zinc-400">Your finished and unfinished interviews will be listed here.</p>
             {newButton}
           </div>
         )}
 
         {rows && rows.length > 0 && (
-          <ul className="divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+          <ul className={`divide-y divide-zinc-200/70 overflow-hidden rounded-2xl dark:divide-zinc-800/70 ${cardClass}`}>
             {rows.map((row) => (
               <li key={row.id} className="flex items-center hover:bg-zinc-50 dark:hover:bg-zinc-900/60">
                 {/* In Progress resumes the chat; everything else goes to the Evaluation page,
@@ -75,7 +75,7 @@ export default function HistoryPage() {
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{row.title}</span>
-                    <span className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-zinc-500">
+                    <span className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
                       {formatDate(row.created_at)}
                       <StatusBadge status={row.status} label={STATUS_LABEL[row.status]} />
                     </span>
@@ -83,7 +83,7 @@ export default function HistoryPage() {
                   {row.overall_score !== null && (
                     <span className="text-right">
                       <span className="block text-xl font-semibold tabular-nums">{row.overall_score}</span>
-                      <span className="block text-xs text-zinc-500">{JUDGE_LABEL[row.judge]} score</span>
+                      <span className="block text-xs text-zinc-600 dark:text-zinc-400">{JUDGE_LABEL[row.judge]} score</span>
                     </span>
                   )}
                 </Link>

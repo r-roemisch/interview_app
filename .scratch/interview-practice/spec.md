@@ -52,7 +52,7 @@ A single-user, local, capstone-grade web app where a candidate rehearses a behav
 
 ## UI
 
-- Polished SaaS look: neutral palette with one accent colour, soft borders, icons from `lucide-react` (the only UI dependency). Interview page is a full-height chat with the Answer box pinned to the bottom.
+- Polished SaaS look: a cool, softly tinted page with a faint indigo glow at the top (not plain white), indigo as the one accent colour, white cards with soft shadows and light borders on top of it, the top bar and the Interview side panel slightly see-through, icons from `lucide-react` (the only UI dependency). The background is static and has a matching dark version. Chosen from prototypes (issue 17). Interview page is a full-height chat with the Answer box pinned to the bottom.
 - Layouts may change; flows and URLs stay as listed in Stack.
 - Light/dark follows the system setting, no toggle. Desktop first; mobile must stay usable.
 - The layout is chosen from throwaway prototypes of the Interview page (issue 14), then applied to all pages (issue 16).

@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { api, ApiError, speechUrl, type Interview, type Message } from "@/lib/api";
 import { DIFFICULTY_OPTIONS, SENIORITY_OPTIONS, STAR_PARTS } from "@/lib/labels";
 import { toWav } from "@/lib/wav";
-import { Button, ErrorBanner, Page, PersonaAvatar, Spinner, StarLetter } from "../../ui";
+import { Button, cardClass, ErrorBanner, glassClass, Page, PersonaAvatar, Spinner, StarLetter } from "../../ui";
 
 type EvaluationState = "polling" | "ready" | "missing";
 
@@ -191,7 +191,7 @@ export default function InterviewPage() {
     <div className="flex h-full">
       <section className="flex min-w-0 flex-1 flex-col">
         {/* Below lg the side panel folds into this strip; tapping it shows the full panel. */}
-        <div className="border-b border-zinc-200 px-4 py-2 lg:hidden dark:border-zinc-800">
+        <div className={`border-b border-zinc-200/70 px-4 py-2 lg:hidden dark:border-zinc-800/70 ${glassClass}`}>
           <button
             onClick={() => setDetailsOpen((o) => !o)}
             aria-expanded={detailsOpen}
@@ -220,7 +220,7 @@ export default function InterviewPage() {
             ))}
             {pending !== null && <AnswerBlock text={pending} dim />}
             {busy && (
-              <li className="rounded-xl border border-dashed border-zinc-300 px-4 py-4 dark:border-zinc-700">
+              <li className="rounded-xl border border-dashed border-zinc-300 bg-white/50 px-4 py-4 dark:border-zinc-700 dark:bg-zinc-900/40">
                 <ThinkingDots name={interview.persona_name} />
               </li>
             )}
@@ -257,7 +257,7 @@ export default function InterviewPage() {
         </div>
       </section>
 
-      <aside className="hidden w-80 shrink-0 overflow-y-auto border-l border-zinc-200 bg-zinc-50/60 p-5 lg:block dark:border-zinc-800 dark:bg-zinc-900/40">
+      <aside className={`hidden w-80 shrink-0 overflow-y-auto border-l border-zinc-200/70 p-5 lg:block dark:border-zinc-800/70 ${glassClass}`}>
         {panel}
       </aside>
     </div>
@@ -287,22 +287,22 @@ function Panel({
         <PersonaAvatar name={interview.persona_name} size="lg" />
         <div className="min-w-0">
           <p className="font-semibold">{interview.persona_name}</p>
-          <p className="text-sm text-zinc-500">{interview.persona_title}</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{interview.persona_title}</p>
         </div>
       </div>
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-        <dt className="text-zinc-500">Job</dt>
+        <dt className="text-zinc-600 dark:text-zinc-400">Job</dt>
         <dd className="font-medium">{interview.title}</dd>
         {interview.industry && (
           <>
-            <dt className="text-zinc-500">Industry</dt>
+            <dt className="text-zinc-600 dark:text-zinc-400">Industry</dt>
             <dd>{interview.industry}</dd>
           </>
         )}
-        <dt className="text-zinc-500">Seniority</dt>
+        <dt className="text-zinc-600 dark:text-zinc-400">Seniority</dt>
         <dd>{seniority}</dd>
-        <dt className="text-zinc-500">Difficulty</dt>
+        <dt className="text-zinc-600 dark:text-zinc-400">Difficulty</dt>
         <dd>{difficulty}</dd>
       </dl>
 
@@ -316,7 +316,7 @@ function Panel({
               <StarLetter letter={part.label[0]} />
               <span>
                 <span className="font-medium">{part.label}</span>
-                <span className="block text-zinc-500">{part.hint}</span>
+                <span className="block text-zinc-600 dark:text-zinc-400">{part.hint}</span>
               </span>
             </li>
           ))}
@@ -354,7 +354,7 @@ function QuestionTracker({ interview, answered, compact = false }: { interview: 
       {!compact && (
         <p className="mb-2 flex justify-between text-sm">
           <span className="font-medium">Questions</span>
-          <span className="tabular-nums text-zinc-500">{summary}</span>
+          <span className="tabular-nums text-zinc-600 dark:text-zinc-400">{summary}</span>
         </p>
       )}
       <div className="flex gap-1" role="img" aria-label={summary}>
@@ -424,9 +424,9 @@ function Entry({
 function AnswerBlock({ text, dim = false }: { text: string; dim?: boolean }) {
   return (
     <li
-      className={`ml-8 whitespace-pre-wrap rounded-xl bg-zinc-100 px-4 py-3 text-[15px] leading-relaxed dark:bg-zinc-800/80 ${dim ? "opacity-60" : ""}`}
+      className={`ml-8 whitespace-pre-wrap rounded-xl px-4 py-3 text-[15px] leading-relaxed ${cardClass} ${dim ? "opacity-60" : ""}`}
     >
-      {text || <em className="text-zinc-500">(no answer given)</em>}
+      {text || <em className="text-zinc-600 dark:text-zinc-400">(no answer given)</em>}
     </li>
   );
 }
@@ -474,7 +474,7 @@ function Composer({
         : (recorder.error ?? "Ctrl+Enter to send");
   return (
     <div className="space-y-2">
-      <div className="flex items-end gap-2 rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-500/10 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="flex items-end gap-2 rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-500/10 dark:border-zinc-800 dark:bg-zinc-900/60">
         <textarea
           aria-label="Your answer"
           value={draft}
@@ -521,7 +521,7 @@ function Composer({
           <ArrowUp className="h-4 w-4" />
         </button>
       </div>
-      <p className={`px-2 text-xs ${recorder.error && !busy && recorder.state === "idle" ? "text-red-600 dark:text-red-400" : "text-zinc-400"}`}>{hint}</p>
+      <p className={`px-2 text-xs ${recorder.error && !busy && recorder.state === "idle" ? "text-red-600 dark:text-red-400" : "text-zinc-600 dark:text-zinc-400"}`}>{hint}</p>
     </div>
   );
 }
@@ -536,7 +536,7 @@ function JudgingFooter({
   onRerun: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+    <div className={`flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3 ${cardClass}`}>
       <span className="flex-1 text-sm text-zinc-600 dark:text-zinc-400">
         {state === "polling" && <Spinner label="Interview finished. The judge is scoring your answers." />}
         {state === "ready" && "Interview finished. Your evaluation is ready."}

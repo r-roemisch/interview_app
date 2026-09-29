@@ -15,7 +15,7 @@ const buttonBase =
 const buttonStyles = {
   primary: "bg-indigo-600 text-white hover:bg-indigo-500 disabled:hover:bg-indigo-600",
   secondary:
-    "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800",
+    "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-200 dark:hover:bg-zinc-800",
   danger:
     "border border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/40",
 };
@@ -63,7 +63,7 @@ export function Page({
       <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          {intro && <div className="mt-1.5 text-sm text-zinc-500">{intro}</div>}
+          {intro && <div className="mt-1.5 text-sm text-zinc-600 dark:text-zinc-400">{intro}</div>}
         </div>
         {actions}
       </header>
@@ -95,7 +95,7 @@ export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: (
 
 export function Spinner({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center gap-2 text-sm text-zinc-500">
+    <span className="inline-flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
       <Loader2 className="h-4 w-4 text-indigo-600 motion-safe:animate-spin dark:text-indigo-400" />
       {label}
     </span>
@@ -107,15 +107,22 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
     <label className="block">
       <span className="mb-1.5 block text-sm font-medium">{label}</span>
       {children}
-      {hint && <span className="mt-1.5 block text-xs text-zinc-500">{hint}</span>}
+      {hint && <span className="mt-1.5 block text-xs text-zinc-600 dark:text-zinc-400">{hint}</span>}
     </label>
   );
 }
 
+/** A white surface that lifts off the tinted page background: sections, rows, answers. */
+export const cardClass =
+  "border border-zinc-200/70 bg-white shadow-sm dark:border-zinc-800/70 dark:bg-zinc-900/60";
+
+/** Bars and panels that let the page background show through (top bar, Interview side panel). */
+export const glassClass = "bg-white/60 backdrop-blur-md dark:bg-zinc-950/50";
+
 export const inputClass =
   "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm shadow-xs outline-none transition-colors " +
   "placeholder:text-zinc-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 " +
-  "dark:border-zinc-800 dark:bg-zinc-900 dark:focus:border-indigo-500";
+  "dark:border-zinc-800 dark:bg-zinc-900/60 dark:focus:border-indigo-500";
 
 const STATUS_STYLE: Record<string, string> = {
   in_progress: "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300",
@@ -157,7 +164,7 @@ export function PersonaAvatar({ name, size = "md" }: { name: string; size?: "sm"
 /** The S / T / A / R letter tile used in the STAR reminder and the STAR Breakdown. */
 export function StarLetter({ letter }: { letter: string }) {
   return (
-    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white text-xs font-semibold text-indigo-700 ring-1 ring-zinc-200 dark:bg-zinc-900 dark:text-indigo-300 dark:ring-zinc-700">
+    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white text-xs font-semibold text-indigo-700 ring-1 ring-zinc-200 dark:bg-zinc-900/60 dark:text-indigo-300 dark:ring-zinc-700">
       {letter}
     </span>
   );

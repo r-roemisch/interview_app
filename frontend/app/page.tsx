@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError, type Difficulty, type Judge, type Seniority } from "@/lib/api";
 import { DIFFICULTY_OPTIONS, JEV_EXPLANATION, JUDGE_OPTIONS, MODE_OPTIONS, SENIORITY_OPTIONS } from "@/lib/labels";
-import { Button, ErrorBanner, Field, inputClass, Page, Spinner } from "./ui";
+import { Button, cardClass, ErrorBanner, Field, inputClass, Page, Spinner } from "./ui";
 
 // Setup page: describe the Job, pick Difficulty and Judge, start an Interview.
 export default function SetupPage() {
@@ -76,7 +76,7 @@ export default function SetupPage() {
   return (
     <Page title="New interview" intro="Describe the job you are practising for. Only the title is required.">
       <form onSubmit={start} className="space-y-8">
-        <section className="space-y-3 rounded-2xl border border-zinc-200 bg-zinc-50/60 p-5 dark:border-zinc-800 dark:bg-zinc-900/40">
+        <section className={`space-y-3 rounded-2xl p-5 ${cardClass}`}>
           <Field label="Job description" hint="Optional. Paste a real posting and the app suggests the fields below.">
             <textarea
               className={`${inputClass} min-h-36`}
@@ -107,14 +107,14 @@ export default function SetupPage() {
             </Field>
             <fieldset>
               <legend className="mb-1.5 text-sm font-medium">Seniority of the role</legend>
-              <div className="grid grid-cols-3 gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-900">
+              <div className="grid grid-cols-3 gap-1 rounded-lg bg-zinc-200/60 p-1 dark:bg-zinc-900/60">
                 {SENIORITY_OPTIONS.map((o) => (
                   <label
                     key={o.value}
                     className={`cursor-pointer rounded-md px-3 py-1.5 text-center text-sm has-focus-visible:outline-2 has-focus-visible:outline-indigo-500 ${
                       seniority === o.value
                         ? "bg-white font-medium shadow-sm dark:bg-zinc-800"
-                        : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+                        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
                     }`}
                   >
                     <input
@@ -139,7 +139,7 @@ export default function SetupPage() {
           <div>
             <ChoiceCards legend="Judge" name="judge" options={JUDGE_OPTIONS} value={judge} onChange={setJudge} />
             {judge === "jev" && (
-              <p className="mt-2 rounded-lg bg-zinc-50 p-3 text-xs leading-relaxed text-zinc-600 dark:bg-zinc-900/60 dark:text-zinc-400">
+              <p className="mt-2 rounded-lg bg-white/70 p-3 text-xs leading-relaxed text-zinc-600 ring-1 ring-zinc-200/70 dark:bg-zinc-900/60 dark:text-zinc-400 dark:ring-zinc-800/70">
                 <span className="font-medium text-zinc-900 dark:text-zinc-100">How the JEV Judge works. </span>
                 {JEV_EXPLANATION}
               </p>
@@ -201,7 +201,7 @@ function PdfUpload({
 
   return (
     <label
-      className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 has-focus-visible:outline-2 has-focus-visible:outline-indigo-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 ${
+      className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 has-focus-visible:outline-2 has-focus-visible:outline-indigo-500 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-200 dark:hover:bg-zinc-800 ${
         disabled || uploading ? "pointer-events-none opacity-50" : ""
       }`}
     >
@@ -236,13 +236,13 @@ function ChoiceCards<T extends string>({
             key={o.value}
             className={`cursor-pointer rounded-xl border p-3.5 text-sm transition-colors has-focus-visible:outline-2 has-focus-visible:outline-indigo-500 ${
               value === o.value
-                ? "border-indigo-500 bg-indigo-50/60 ring-1 ring-indigo-500 dark:bg-indigo-500/10"
-                : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700"
+                ? "border-indigo-500 bg-indigo-50 shadow-sm ring-1 ring-indigo-500 dark:bg-indigo-500/15"
+                : "border-zinc-200/70 bg-white shadow-sm hover:border-zinc-300 dark:border-zinc-800/70 dark:bg-zinc-900/60 dark:hover:border-zinc-700"
             }`}
           >
             <input type="radio" name={name} value={o.value} checked={value === o.value} onChange={() => onChange(o.value)} className="sr-only" />
             <span className="font-medium">{o.label}</span>
-            <span className="mt-1 block text-xs leading-relaxed text-zinc-500">{o.hint}</span>
+            <span className="mt-1 block text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">{o.hint}</span>
           </label>
         ))}
       </div>
