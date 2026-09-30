@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from interview_app.llm import LLMClient, LLMUnavailable, strip_code_fence
 from interview_app.models import (
     QUESTION_CAP,
+    Demeanor,
     Difficulty,
     Interview,
     InterviewStatus,
@@ -60,6 +61,7 @@ def start_interview(
     seniority: Seniority,
     job_description: str | None,
     difficulty: Difficulty,
+    demeanor: Demeanor = Demeanor.FRIENDLY,
     cv: str | None = None,
     judge: Judge = Judge.LLM,
     voice_interview: bool = False,
@@ -73,6 +75,7 @@ def start_interview(
         seniority=seniority,
         job_description=job_description.strip() if job_description else None,
         difficulty=difficulty,
+        demeanor=demeanor,
         cv=(cv or "").strip() or None,
         judge=judge,
         voice_interview=voice_interview,

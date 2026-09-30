@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from interview_app.models import QUESTION_CAP, Difficulty, InterviewStatus, Judge, MessageRole, Seniority, Verdict
+from interview_app.models import QUESTION_CAP, Demeanor, Difficulty, InterviewStatus, Judge, MessageRole, Seniority, Verdict
 
 
 class MessageOut(BaseModel):
@@ -28,6 +28,7 @@ class InterviewOut(BaseModel):
     seniority: Seniority
     job_description: str | None
     difficulty: Difficulty
+    demeanor: Demeanor
     judge: Judge
     persona_name: str
     persona_title: str

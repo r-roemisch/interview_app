@@ -1,4 +1,4 @@
-import type { Difficulty, InterviewStatus, Judge, Seniority, Verdict } from "./api";
+import type { Demeanor, Difficulty, InterviewStatus, Judge, Seniority, Verdict } from "./api";
 
 export const STATUS_LABEL: Record<InterviewStatus, string> = {
   in_progress: "In progress",
@@ -23,6 +23,11 @@ export const DIFFICULTY_OPTIONS: { value: Difficulty; label: string; hint: strin
   { value: "easy", label: "Easy", hint: "Common questions, no follow-ups" },
   { value: "normal", label: "Normal", hint: "Standard questions, one follow-up when vague" },
   { value: "hard", label: "Hard", hint: "Probing follow-ups, expects metrics and trade-offs" },
+];
+
+export const DEMEANOR_OPTIONS: { value: Demeanor; label: string; hint: string }[] = [
+  { value: "friendly", label: "Friendly", hint: "Patient and polite" },
+  { value: "rude", label: "Rude", hint: "Impatient, sceptical, curt" },
 ];
 
 export const JUDGE_OPTIONS: { value: Judge; label: string; hint: string }[] = [

@@ -27,8 +27,12 @@ Values for Job fields suggested by the app from a pasted Job Description. The us
 _Avoid_: Auto-fill, defaults
 
 **Difficulty**:
-How demanding the interviewer's questions and follow-ups are. Easy: common, direct questions, no follow-ups, the CV is ignored. Normal: standard questions, one follow-up when an Answer is vague, some Questions may draw on the CV. Hard: situational, probing questions with follow-ups that challenge specifics and expect metrics and trade-offs, including claims made in the CV.
+How demanding the interviewer's questions and follow-ups are. Easy: common, direct questions, no follow-ups, the CV is ignored. Normal: standard questions, one follow-up when an Answer is vague, some Questions may draw on the CV. Hard: situational, probing questions with follow-ups that challenge specifics and expect metrics and trade-offs, including claims made in the CV. Difficulty decides what is asked, never the manner: that belongs to Demeanor.
 _Avoid_: Mode, level, rude
+
+**Demeanor**:
+How the interviewer treats the candidate: Friendly (the default) or Rude. Chosen at Setup, independent of Difficulty. A Rude interviewer is impatient, curt, openly sceptical and mildly sarcastic, but stays professional: no insults, no profanity, no remarks about the person. It holds from the greeting through the Closing and is shown in the Portrait. It changes only the wording, never the voice or the Persona. Practice again keeps it. The Judge never sees it.
+_Avoid_: Tone, mood, attitude, personality
 
 ### Interview
 
@@ -53,11 +57,11 @@ An Interview that no longer accepts Answers but whose Evaluation could not be pr
 _Avoid_: Failed, errored, pending
 
 **Persona**:
-The name and job title the interviewer presents as during one Interview, invented to fit the Job. It decides who is asking, never how: tone and strictness belong to Difficulty. The Persona speaks in Questions and the Closing, never in the Evaluation. In a Voice Interview the Persona has its own voice, which belongs to who is asking. A Persona may have a Portrait.
+The name and job title the interviewer presents as during one Interview, invented to fit the Job. It decides who is asking, never how: strictness belongs to Difficulty and manner to Demeanor. The Persona speaks in Questions and the Closing, never in the Evaluation. In a Voice Interview the Persona has its own voice, which belongs to who is asking. A Persona may have a Portrait.
 _Avoid_: Character, avatar, interviewer profile
 
 **Portrait**:
-A picture of the Persona, invented to fit its name, job title and voice and the Job's industry. Optional, chosen at Setup. It belongs to one Interview and stays the same for all of it; Practice again gets a new Persona and so a new Portrait.
+A picture of the Persona, invented to fit its name, job title and voice, the Job's industry and the Demeanor. Optional, chosen at Setup. It belongs to one Interview and stays the same for all of it; Practice again gets a new Persona and so a new Portrait.
 _Avoid_: Avatar, photo, picture, image
 
 **Question**:
@@ -87,7 +91,7 @@ A single 0-100 number the Judge assigns to the whole Interview, using the STAR B
 _Avoid_: Grade, total, rating
 
 **Judge**:
-The evaluator that scores the Interview, separate from the interviewer so the interviewer's style does not bias the score. There are two: the LLM Judge and the JEV Judge. Each Interview has one chosen Judge, picked at Setup; the other may be run afterwards for comparison.
+The evaluator that scores the Interview, separate from the interviewer so the interviewer's style, including its Demeanor, does not bias the score. There are two: the LLM Judge and the JEV Judge. Each Interview has one chosen Judge, picked at Setup; the other may be run afterwards for comparison.
 _Avoid_: LLM-as-a-judge, grader
 
 **LLM Judge**:

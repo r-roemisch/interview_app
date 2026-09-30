@@ -1,13 +1,13 @@
 "use client";
 
 import { FileUp, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, ApiError, type Difficulty, type Judge, type Seniority } from "@/lib/api";
-import { DIFFICULTY_OPTIONS, JEV_EXPLANATION, JUDGE_OPTIONS, MODE_OPTIONS, SENIORITY_OPTIONS } from "@/lib/labels";
+import { api, ApiError, type Demeanor, type Difficulty, type Judge, type Seniority } from "@/lib/api";
+import { DEMEANOR_OPTIONS, DIFFICULTY_OPTIONS, JEV_EXPLANATION, JUDGE_OPTIONS, MODE_OPTIONS, SENIORITY_OPTIONS } from "@/lib/labels";
 import { Button, cardClass, ErrorBanner, Field, inputClass, Page, Spinner } from "./ui";
 
-// Setup page: describe the Job, pick Difficulty and Judge, start an Interview.
+// Setup page: describe the Job, pick Difficulty, Demeanor and Judge, start an Interview.
 export default function SetupPage() {
   const router = useRouter();
 
@@ -17,6 +17,9 @@ export default function SetupPage() {
   const [seniority, setSeniority] = useState<Seniority>("mid");
   const [jobDescription, setJobDescription] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("normal");
+  const [demeanor, setDemeanor] = useState<Demeanor>("friendly");
+  // Recommend settings sits below the fields it fills, so it scrolls them back into view.
+  const settingsRef = useRef<HTMLElement>(null);
   const [cv, setCv] = useState("");
   const [judge, setJudge] = useState<Judge>("llm");
   const [mode, setMode] = useState<"written" | "voice">("written");
@@ -43,6 +46,7 @@ export default function SetupPage() {
       setTitle(rec.title);
       setIndustry(rec.industry ?? "");
       setSeniority(rec.seniority);
+      settingsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not get recommendations.");
     } finally {
@@ -61,6 +65,7 @@ export default function SetupPage() {
         seniority,
         job_description: jobDescription.trim() || null,
         difficulty,
+        demeanor,
         cv: cv.trim() || null,
         judge,
         voice_interview: mode === "voice",
@@ -78,27 +83,9 @@ export default function SetupPage() {
   return (
     <Page title="New interview" intro="Describe the job you are practising for. Only the title is required.">
       <form onSubmit={start} className="space-y-8">
-        <section className={`space-y-3 rounded-2xl p-5 ${cardClass}`}>
-          <Field label="Job description" hint="Optional. Paste a real posting and the app suggests the fields below.">
-            <textarea
-              className={`${inputClass} min-h-36`}
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-              maxLength={20000}
-              placeholder="Paste the job posting here"
-            />
-          </Field>
-          <div className="flex items-center gap-3">
-            <Button type="button" variant="secondary" onClick={recommend} disabled={busy || !jobDescription.trim()}>
-              <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-              Recommend settings
-            </Button>
-            <PdfUpload onText={setJobDescription} onError={setError} disabled={busy} />
-            {recommending && <Spinner label="Reading the posting..." />}
-          </div>
-        </section>
-
-        <div className="space-y-5">
+        {/* The settings to choose come first; the documents to paste or upload follow (spec: rude-interviewer). */}
+        <section ref={settingsRef} className={`space-y-5 rounded-2xl p-5 ${cardClass}`}>
+          <h2 className="font-semibold">Interview settings</h2>
           <Field label="Job title">
             <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="e.g. Backend Engineer" />
           </Field>
@@ -150,6 +137,8 @@ export default function SetupPage() {
 
           <ChoiceCards legend="Difficulty" name="difficulty" options={DIFFICULTY_OPTIONS} value={difficulty} onChange={setDifficulty} />
 
+          <ChoiceCards legend="Demeanor" name="demeanor" options={DEMEANOR_OPTIONS} value={demeanor} onChange={setDemeanor} />
+
           <div>
             <ChoiceCards legend="Judge" name="judge" options={JUDGE_OPTIONS} value={judge} onChange={setJudge} />
             {judge === "jev" && (
@@ -159,17 +148,41 @@ export default function SetupPage() {
               </p>
             )}
           </div>
+        </section>
 
-          <Field label="Your CV" hint="Optional. On Normal and Hard the interviewer asks about your experience. Only the interviewer reads it.">
-            <textarea
-              className={`${inputClass} min-h-28`}
-              value={cv}
-              onChange={(e) => setCv(e.target.value)}
-              maxLength={20000}
-              placeholder="Paste your CV here"
-            />
-          </Field>
-          <PdfUpload onText={setCv} onError={setError} disabled={busy} />
+        <div className="space-y-4">
+          <h2 className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Optional documents</h2>
+          <section className={`space-y-3 rounded-2xl p-5 ${cardClass}`}>
+            <Field label="Job description" hint="Paste a real posting, then Recommend settings fills Job title, Industry and Seniority above.">
+              <textarea
+                className={`${inputClass} min-h-36`}
+                value={jobDescription}
+                onChange={(e) => setJobDescription(e.target.value)}
+                maxLength={20000}
+                placeholder="Paste the job posting here"
+              />
+            </Field>
+            <div className="flex items-center gap-3">
+              <Button type="button" variant="secondary" onClick={recommend} disabled={busy || !jobDescription.trim()}>
+                <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                Recommend settings
+              </Button>
+              <PdfUpload onText={setJobDescription} onError={setError} disabled={busy} />
+              {recommending && <Spinner label="Reading the posting..." />}
+            </div>
+          </section>
+          <section className={`space-y-3 rounded-2xl p-5 ${cardClass}`}>
+            <Field label="Your CV" hint="On Normal and Hard the interviewer asks about your experience. Only the interviewer reads it.">
+              <textarea
+                className={`${inputClass} min-h-28`}
+                value={cv}
+                onChange={(e) => setCv(e.target.value)}
+                maxLength={20000}
+                placeholder="Paste your CV here"
+              />
+            </Field>
+            <PdfUpload onText={setCv} onError={setError} disabled={busy} />
+          </section>
         </div>
 
         {error && <ErrorBanner message={error} />}

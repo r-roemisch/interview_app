@@ -3,6 +3,7 @@
 
 export type Seniority = "junior" | "mid" | "senior";
 export type Difficulty = "easy" | "normal" | "hard";
+export type Demeanor = "friendly" | "rude";
 export type Judge = "llm" | "jev";
 export type InterviewStatus = "in_progress" | "judging" | "completed" | "evaluation_missing";
 export type MessageRole = "question" | "answer" | "closing";
@@ -24,6 +25,7 @@ export interface Interview {
   seniority: Seniority;
   job_description: string | null;
   difficulty: Difficulty;
+  demeanor: Demeanor;
   judge: Judge;
   persona_name: string;
   persona_title: string;
@@ -44,6 +46,7 @@ export interface InterviewCreate {
   seniority: Seniority;
   job_description?: string | null;
   difficulty: Difficulty;
+  demeanor: Demeanor;
   cv?: string | null;
   judge: Judge;
   voice_interview: boolean;

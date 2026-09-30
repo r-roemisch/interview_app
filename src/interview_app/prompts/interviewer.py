@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from interview_app.llm import Message
-from interview_app.models import QUESTION_CAP, Difficulty, Interview, MessageRole
+from interview_app.models import QUESTION_CAP, Demeanor, Difficulty, Interview, MessageRole
 
 _DIFFICULTY_RULES = {
     Difficulty.EASY: (
@@ -20,6 +20,14 @@ _DIFFICULTY_RULES = {
         "candidate personally did versus the team."
     ),
 }
+
+# Friendly adds nothing: the default prompt is the friendly interviewer (CONTEXT.md: Demeanor).
+_RUDE_RULE = (
+    "Demeanor: RUDE. From your greeting to your closing message you are impatient, curt, openly "
+    "sceptical and mildly sarcastic, e.g. \"Fine. Next.\" or \"That doesn't sound like much.\" "
+    "You may cut a long answer short. Stay professional: never insult, never swear, and never "
+    "comment on the candidate as a person (appearance, background, accent)."
+)
 
 
 _CV_RULES = {
@@ -40,6 +48,7 @@ def build_system_prompt(interview: Interview) -> str:
         f"You are {interview.persona_name}, {interview.persona_title}, running a behavioral job interview.",
         f"The position is: {interview.title} ({interview.seniority.value} level){industry}.",
         _DIFFICULTY_RULES[interview.difficulty],
+        *([_RUDE_RULE] if interview.demeanor == Demeanor.RUDE else []),
         "Rules:",
         "- Ask exactly one question per message. Never ask two questions at once.",
         "- Do not evaluate, grade or coach the candidate during the interview.",

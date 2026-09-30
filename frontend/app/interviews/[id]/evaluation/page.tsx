@@ -121,6 +121,8 @@ export default function EvaluationPage() {
   const chips = [
     SENIORITY_OPTIONS.find((o) => o.value === interview.seniority)?.label,
     `${DIFFICULTY_OPTIONS.find((o) => o.value === interview.difficulty)?.label} difficulty`,
+    // Only Rude is worth a chip: Friendly is the default (spec: rude-interviewer).
+    interview.demeanor === "rude" ? "Rude interviewer" : null,
     interview.industry,
     interview.ended_early ? "Ended early" : null,
   ].filter(Boolean) as string[];

@@ -9,7 +9,7 @@ from interview_app.db import get_db, get_session_factory
 from interview_app.images import ImageClient, get_image_client, image_type
 from interview_app.jev import JevClient, get_jev_client
 from interview_app.llm import LLMClient, LLMUnavailable, get_llm_client
-from interview_app.models import Difficulty, Interview, InterviewStatus, Judge, PortraitStatus, Seniority
+from interview_app.models import Demeanor, Difficulty, Interview, InterviewStatus, Judge, PortraitStatus, Seniority
 from interview_app.schemas import EvaluationOut, HistoryRow, InterviewOut
 from interview_app.services import interview as svc
 from interview_app.services import judge
@@ -24,6 +24,7 @@ class InterviewCreate(BaseModel):
     seniority: Seniority = Seniority.MID
     job_description: str | None = Field(default=None, max_length=20_000)
     difficulty: Difficulty = Difficulty.NORMAL
+    demeanor: Demeanor = Demeanor.FRIENDLY
     cv: str | None = Field(default=None, max_length=20_000)
     judge: Judge = Judge.LLM
     voice_interview: bool = False
@@ -81,6 +82,7 @@ def create_interview(
             seniority=body.seniority,
             job_description=body.job_description,
             difficulty=body.difficulty,
+            demeanor=body.demeanor,
             cv=body.cv,
             judge=body.judge,
             voice_interview=body.voice_interview,
@@ -240,7 +242,7 @@ def practice_again(
     session_factory=Depends(get_session_factory),
     images: ImageClient = Depends(get_image_client),
 ) -> Interview:
-    """New Interview from the same Job snapshot, Difficulty, CV, Judge, voice and Portrait settings;
+    """New Interview from the same Job snapshot, Difficulty, Demeanor, CV, Judge, voice and Portrait settings;
     fresh Persona, so a fresh Portrait."""
     try:
         again = svc.start_interview(
@@ -251,6 +253,7 @@ def practice_again(
             seniority=interview.seniority,
             job_description=interview.job_description,
             difficulty=interview.difficulty,
+            demeanor=interview.demeanor,
             cv=interview.cv,
             judge=interview.judge,
             voice_interview=interview.voice_interview,

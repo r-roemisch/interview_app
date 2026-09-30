@@ -316,7 +316,7 @@ function Panel({
         <dt className="text-zinc-600 dark:text-zinc-400">Seniority</dt>
         <dd>{seniority}</dd>
         <dt className="text-zinc-600 dark:text-zinc-400">Difficulty</dt>
-        <dd>{difficulty}</dd>
+        <dd>{interview.demeanor === "rude" ? `${difficulty} · Rude` : difficulty}</dd>
       </dl>
 
       <QuestionTracker interview={interview} answered={answered} />

@@ -45,6 +45,8 @@ Each Interview is scored by the Judge chosen on Setup: the LLM Judge, which writ
 
 A Voice Interview (chosen on Setup) reads every Question and the Closing aloud in the Persona's voice (`TTS_MODEL`) and adds a mic button to the Answer box: the recording is transcribed (`STT_MODEL`) into the box, where you edit it and send it like a typed Answer. No audio is stored (ADR-0004). Both directions use the audio chat model `openai/gpt-audio-mini`, prompted to read a text word for word or to write down a recording; the browser converts each recording to WAV first (ADR-0005). The mic works on http://localhost without HTTPS.
 
+The interviewer's Demeanor is chosen on Setup, next to Difficulty: Friendly (the default) or Rude. A Rude interviewer is impatient, curt and sceptical from the greeting to the Closing, but never insults or swears; its Portrait looks stern with crossed arms. Only the interviewer and the Portrait see it: the Persona call and both Judges do not, so scores stay comparable.
+
 The interviewer can have a Portrait (a switch on Setup, on by default, about 4 cents): a photorealistic headshot of the Persona made by `IMAGE_MODEL` in the background while the Interview starts. It is saved with the Interview and shown in the side panel on the left, with the initials pulsing until it arrives; if it cannot be made, the initials stay.
 
 ## Prerequisites
@@ -110,7 +112,7 @@ Frontend, in `frontend/.env.local`:
 
 ### After a change to the tables
 
-There are no migrations: at startup the backend creates missing tables but never adds columns to existing ones. When a change adds columns (the Persona, the CV, the Judge choice and Voice Interviews did), delete `interview.db` and restart the backend. This also deletes your History.
+There are no migrations: at startup the backend creates missing tables but never adds columns to existing ones. When a change adds columns (the Persona, the CV, the Judge choice, Voice Interviews and the Demeanor did), delete `interview.db` and restart the backend. This also deletes your History.
 
 ### "Model blocked by guardrail"
 

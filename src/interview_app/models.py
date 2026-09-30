@@ -54,6 +54,11 @@ class Difficulty(StrEnum):
     HARD = "hard"
 
 
+class Demeanor(StrEnum):
+    FRIENDLY = "friendly"
+    RUDE = "rude"
+
+
 class Judge(StrEnum):
     LLM = "llm"
     JEV = "jev"
@@ -119,6 +124,8 @@ class Interview(Base):
     cv: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     difficulty: Mapped[Difficulty] = mapped_column(_enum(Difficulty), default=Difficulty.NORMAL)
+    # How the interviewer treats the candidate; read by the interviewer and the Portrait, never the Judge.
+    demeanor: Mapped[Demeanor] = mapped_column(_enum(Demeanor), default=Demeanor.FRIENDLY)
     # The chosen Judge: its Evaluation decides the status and the History score (ADR-0003).
     judge: Mapped[Judge] = mapped_column(_enum(Judge), default=Judge.LLM)
     # Persona: invented per Interview, never copied by Practice again.
