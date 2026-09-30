@@ -12,6 +12,9 @@ from interview_app.llm import LLMUnavailable
 from interview_app.routers.speech import MAX_AUDIO_BYTES
 from interview_app.speech import SAMPLE_RATE, DevFakeSpeechClient, OpenRouterSpeechClient
 
+# The first bytes the transcription endpoint checks for (spec: security-guards C3).
+WAV = b"RIFF\x24\x00\x00\x00WAVEfmt " + b"\x00" * 20
+MP3 = b"ID3\x04\x00" + b"\x00" * 20
 PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voice": "coral"})
 
 
@@ -46,15 +49,37 @@ def test_speech_failure_is_503(client, llm, speech):
     assert client.get(f"/interviews/{iv['id']}/messages/{iv['messages'][0]['id']}/speech").status_code == 503
 
 
+def test_written_interviews_are_never_spoken(client, llm, speech):
+    llm.responses += [PERSONA, "Hi, I'm Priya. First question?"]
+    iv = client.post("/interviews", json={"title": "Backend Engineer"}).json()
+    assert client.get(f"/interviews/{iv['id']}/messages/{iv['messages'][0]['id']}/speech").status_code == 404
+    assert speech.calls == []
+
+
 @pytest.mark.parametrize(
-    ("content_type", "audio_format"),
-    [("audio/wav", "wav"), ("audio/x-wav", "wav"), ("audio/mpeg", "mp3")],
+    ("content_type", "audio", "audio_format"),
+    [
+        ("audio/wav", WAV, "wav"),
+        ("audio/x-wav", WAV, "wav"),
+        ("audio/mpeg", MP3, "mp3"),
+        ("audio/mpeg", b"\xff\xfb\x90\x00" + b"\x00" * 20, "mp3"),  # an MPEG frame without an ID3 tag
+    ],
 )
-def test_transcription_returns_text_and_names_the_format(client, speech, content_type, audio_format):
-    r = client.post("/transcriptions", files={"file": ("blob", b"audio bytes", content_type)})
+def test_transcription_returns_text_and_names_the_format(client, speech, content_type, audio, audio_format):
+    r = client.post("/transcriptions", files={"file": ("blob", audio, content_type)})
     assert r.status_code == 200, r.text
     assert r.json() == {"text": "I led the migration."}
-    assert speech.calls[-1] == {"transcribe": audio_format, "size": 11}
+    assert speech.calls[-1] == {"transcribe": audio_format, "size": len(audio)}
+
+
+@pytest.mark.parametrize(
+    ("content_type", "audio"),
+    [("audio/wav", b"audio bytes that are not a wav"), ("audio/wav", MP3), ("audio/mpeg", WAV)],
+)
+def test_transcription_rejects_files_whose_bytes_do_not_match_their_type(client, speech, content_type, audio):
+    r = client.post("/transcriptions", files={"file": ("blob", audio, content_type)})
+    assert (r.status_code, r.json()["detail"]) == (422, "This audio format is not supported.")
+    assert speech.calls == []
 
 
 def test_transcription_rejects_other_formats_and_large_files(client):
@@ -68,7 +93,7 @@ def test_transcription_rejects_other_formats_and_large_files(client):
 
 def test_transcription_failure_is_503(client, speech):
     speech.error = LLMUnavailable("down")
-    r = client.post("/transcriptions", files={"file": ("a.wav", b"x", "audio/wav")})
+    r = client.post("/transcriptions", files={"file": ("a.wav", WAV, "audio/wav")})
     assert r.status_code == 503
 
 

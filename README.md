@@ -49,6 +49,10 @@ The interviewer's Demeanor is chosen on Setup, next to Difficulty: Friendly (the
 
 The interviewer can have a Portrait (a switch on Setup, on by default, about 4 cents): a photorealistic headshot of the Persona made by `IMAGE_MODEL` in the background while the Interview starts. It is saved with the Interview and shown in the side panel on the left, with the initials pulsing until it arrives; if it cannot be made, the initials stay.
 
+### Guards
+
+Pasted and uploaded text, and the candidate's Answers, are treated as data, never as instructions (`prompts/untrusted.py`): the prompts say so, our own tags (`<cv>`, `<job_description>`, `<answer>`) are removed from that text, and each Answer reaches the Judges in its own `<answer n>` tag. An Answer that tries to instruct the interviewer or the Judge becomes a Flagged Answer: both Judges report it (JEV at a probability of 0.7 or more), the code sets its STAR ratings to 1, and the Evaluation page says why. An interviewer reply longer than 600 characters, or repeating its own instructions, is asked for once more, then replaced by a fixed neutral Question or Closing. The LLM Judge's texts have length limits, and JEV values outside 0-1 make its Evaluation missing. Uploads: a PDF is read up to 30 pages and 20,000 characters, with a notice when it was cut; a recording must start like a WAV or MP3 file; only Voice Interviews are spoken. Left out on purpose, since every copy runs on localhost for one person: login, rate limits, spending caps and security headers (see `.scratch/security-guards/spec.md`).
+
 ## Prerequisites
 
 - [uv](https://docs.astral.sh/uv/) (installs Python 3.12 for you)

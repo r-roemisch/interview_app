@@ -17,7 +17,8 @@ from interview_app import db as db_module
 from interview_app.jev import JevClient, _default_jev_client
 from interview_app.llm import LLMClient, LLMUnavailable, _default_client, strip_code_fence
 from interview_app.models import Evaluation, Interview, InterviewStatus, Judge, MessageRole
-from interview_app.prompts.judge import JudgeOutput, judge_json_schema, messages_for_judge
+from interview_app.prompts.jev_judge import STAR_PARTS
+from interview_app.prompts.judge import JudgeAnswerAssessment, JudgeOutput, judge_json_schema, messages_for_judge
 from interview_app.services import jev_judge
 
 log = logging.getLogger(__name__)
@@ -45,11 +46,22 @@ def _parse(raw: str, expected_answers: int) -> JudgeOutput:
     return out
 
 
+FLAGGED_COMMENT = "Contained instructions to the Judge."
+
+
+def _breakdown(position: int, assessment: JudgeAnswerAssessment) -> dict:
+    # A Flagged Answer scores as no answer, enforced here: the Judge that flagged it just read an
+    # attempt to manipulate it, so its ratings are not trusted (CONTEXT.md: Flagged Answer).
+    if assessment.flagged:
+        no_answer = {"rating": 1, "comment": FLAGGED_COMMENT}
+        return {"position": position, "flagged": True, **{part: no_answer for part in STAR_PARTS}}
+    return {"position": position, **assessment.model_dump()}
+
+
 def _to_evaluation(interview: Interview, out: JudgeOutput) -> Evaluation:
     answer_positions = [m.position for m in interview.messages if m.role == MessageRole.ANSWER]
     breakdowns = [
-        {"position": pos, **assessment.model_dump()}
-        for pos, assessment in zip(answer_positions, out.answers, strict=True)
+        _breakdown(pos, assessment) for pos, assessment in zip(answer_positions, out.answers, strict=True)
     ]
     return Evaluation(
         overall_score=out.overall_score,

@@ -22,7 +22,13 @@ from interview_app.models import (
     Portrait,
     Seniority,
 )
-from interview_app.prompts.interviewer import messages_for_closing, messages_for_next_question
+from interview_app.prompts.interviewer import (
+    FALLBACK_CLOSING,
+    fallback_question,
+    messages_for_closing,
+    messages_for_next_question,
+    reply_problem,
+)
 from interview_app.prompts.persona import DEFAULT_PERSONA, Persona, messages_for_persona, persona_schema
 
 log = logging.getLogger(__name__)
@@ -40,6 +46,18 @@ def _append(interview: Interview, role: MessageRole, text: str) -> Message:
     msg = Message(role=role, text=text, position=len(interview.messages))
     interview.messages.append(msg)
     return msg
+
+
+def _interviewer_says(llm: LLMClient, interview: Interview, messages: list, *, closing: bool) -> str:
+    """The interviewer's reply, checked: one more try when it fails, then a fixed fallback (spec: B1)."""
+    for attempt in (1, 2):
+        reply = llm.complete(messages).strip()
+        problem = reply_problem(reply)
+        if problem is None:
+            return reply
+        log.warning("Interviewer reply rejected for interview %s (attempt %d): %s", interview.id, attempt, problem)
+    log.warning("Interviewer fallback used for interview %s", interview.id)
+    return FALLBACK_CLOSING if closing else fallback_question(interview)
 
 
 def create_persona(llm: LLMClient, interview: Interview) -> Persona:
@@ -83,8 +101,8 @@ def start_interview(
     )
     persona = create_persona(llm, interview)
     interview.persona_name, interview.persona_title, interview.persona_voice = persona.name, persona.title, persona.voice
-    first_question = llm.complete(messages_for_next_question(interview))
-    _append(interview, MessageRole.QUESTION, first_question.strip())
+    first_question = _interviewer_says(llm, interview, messages_for_next_question(interview), closing=False)
+    _append(interview, MessageRole.QUESTION, first_question)
     db.add(interview)
     db.commit()
     db.refresh(interview)
@@ -107,11 +125,11 @@ def submit_answer(
     _append(interview, MessageRole.ANSWER, text.strip())
     try:
         if interview.question_count < QUESTION_CAP:
-            reply = llm.complete(messages_for_next_question(interview))
-            _append(interview, MessageRole.QUESTION, reply.strip())
+            reply = _interviewer_says(llm, interview, messages_for_next_question(interview), closing=False)
+            _append(interview, MessageRole.QUESTION, reply)
         else:
-            reply = llm.complete(messages_for_closing(interview, ended_early=False))
-            _append(interview, MessageRole.CLOSING, reply.strip())
+            reply = _interviewer_says(llm, interview, messages_for_closing(interview, ended_early=False), closing=True)
+            _append(interview, MessageRole.CLOSING, reply)
             interview.status = InterviewStatus.JUDGING
     except Exception:
         db.rollback()
@@ -135,8 +153,8 @@ def end_interview(
     if interview.answer_count == 0:
         raise InterviewStateError("Answer at least one question before ending the interview")
 
-    reply = llm.complete(messages_for_closing(interview, ended_early=True))
-    _append(interview, MessageRole.CLOSING, reply.strip())
+    reply = _interviewer_says(llm, interview, messages_for_closing(interview, ended_early=True), closing=True)
+    _append(interview, MessageRole.CLOSING, reply)
     interview.ended_early = True
     interview.status = InterviewStatus.JUDGING
     db.commit()

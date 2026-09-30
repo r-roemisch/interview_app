@@ -1,6 +1,6 @@
 # 02 Flagged Answers (backend)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 01
 
 See spec "A3", "Tests"; `CONTEXT.md` (Flagged Answer).
@@ -15,3 +15,4 @@ See spec "A3", "Tests"; `CONTEXT.md` (Flagged Answer).
 Done when the A3 tests pass and the whole suite is green.
 
 ## Comments
+- 2026-09-30: Done. `JudgeAnswerAssessment.flagged` (default false, so a reply without it is still valid); `answer{n}_flagged` yes/no for JEV, flagged at ≥ 0.7 (`FLAG_THRESHOLD`); both services set a Flagged Answer's four ratings to 1 (LLM comments "Contained instructions to the Judge.", JEV confidences None). `StarBreakdown.flagged = False`, stored in the JSON, no column. The dev fake JEV never flags. `tests/test_flagged_answers.py` 7 tests.

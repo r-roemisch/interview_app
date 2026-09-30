@@ -1,6 +1,6 @@
 "use client";
 
-import { History, RotateCcw, RotateCw, Scale, Scale3d } from "lucide-react";
+import { History, RotateCcw, RotateCw, Scale, Scale3d, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api, ApiError, type Evaluation, type Interview, type Judge, type Message, type StarBreakdown, type Verdict } from "@/lib/api";
@@ -307,22 +307,31 @@ function Transcript({
 
 function StarRows({ breakdown }: { breakdown: StarBreakdown }) {
   return (
-    <ul className="divide-y divide-zinc-100 text-sm dark:divide-zinc-800">
-      {STAR_PARTS.map((part) => {
-        const r = breakdown[part.key];
-        return (
-          <li key={part.key} className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-1 px-4 py-2.5 sm:grid-cols-[auto_7rem_1fr]">
-            <StarLetter letter={part.label[0]} />
-            <span className="flex items-center gap-2 pt-1">
-              <span className="font-medium sm:hidden">{part.label}</span>
-              <RatingBar rating={r.rating} label={part.label} />
-              {r.confidence != null && <Confidence value={r.confidence} />}
-            </span>
-            {r.comment && <span className="col-start-2 text-zinc-600 sm:col-start-3 sm:pt-0.5 dark:text-zinc-400">{r.comment}</span>}
-          </li>
-        );
-      })}
-    </ul>
+    <>
+      {breakdown.flagged && (
+        <p className="flex items-start gap-2 border-b border-amber-200/70 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          This Answer contained instructions to the Judge, so it was scored as no answer.
+        </p>
+      )}
+      <ul className="divide-y divide-zinc-100 text-sm dark:divide-zinc-800">
+        {STAR_PARTS.map((part) => {
+          const r = breakdown[part.key];
+          return (
+            <li key={part.key} className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-1 px-4 py-2.5 sm:grid-cols-[auto_7rem_1fr]">
+              <StarLetter letter={part.label[0]} />
+              <span className="flex items-center gap-2 pt-1">
+                <span className="font-medium sm:hidden">{part.label}</span>
+                <RatingBar rating={r.rating} label={part.label} />
+                {r.confidence != null && <Confidence value={r.confidence} />}
+              </span>
+              {/* A Flagged Answer's comments only repeat the note above. */}
+              {r.comment && !breakdown.flagged && <span className="col-start-2 text-zinc-600 sm:col-start-3 sm:pt-0.5 dark:text-zinc-400">{r.comment}</span>}
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }
 
@@ -384,7 +393,8 @@ function RunOtherJudge({ interviewId, judge, onDone }: { interviewId: number; ju
 // Both Judges side by side on the same transcript: scores, verdicts, and STAR ratings per Answer.
 function Comparison({ chosen, other }: { chosen: Evaluation; other: Evaluation }) {
   const cols = [chosen, other];
-  const stars = (b: StarBreakdown) => STAR_PARTS.map((p) => `${p.label[0]}${b[p.key].rating}`).join(" ");
+  const stars = (b: StarBreakdown) =>
+    STAR_PARTS.map((p) => `${p.label[0]}${b[p.key].rating}`).join(" ") + (b.flagged ? " · flagged" : "");
   return (
     <section>
       <h2 className="mb-3 text-lg font-semibold">Judges compared</h2>

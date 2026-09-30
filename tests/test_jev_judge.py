@@ -7,12 +7,14 @@ PERSONA = json.dumps({"name": "Priya Nair", "title": "Head of Engineering", "voi
 CV = "Led the billing migration at Acme."
 
 
-def _jev_answers(answers: int, *, star=2.0, overall=4.5, verdict="hire", checks=None) -> dict:
+def _jev_answers(answers: int, *, star=2.0, overall=4.5, verdict="hire", checks=None, flags=None) -> dict:
     checks = checks or [0.9] * len(CHECKLIST)
+    flags = flags or [0.1] * answers
     out = {}
     for n in range(1, answers + 1):
         for part in ("situation", "task", "action", "result"):
             out[f"answer{n}_{part}"] = {"type": "score", "score": star, "confidence": 0.8}
+        out[f"answer{n}_flagged"] = {"type": "noul", "noul": flags[n - 1]}
     out["overall"] = {"type": "score", "score": overall, "confidence": 0.7}
     out["verdict"] = {"type": "choice", "choice": verdict, "confidence": 0.6}
     for i, p in enumerate(checks):
@@ -39,13 +41,14 @@ def test_jev_request_has_star_overall_verdict_and_checklist_questions(client, ll
 
     call = jev.calls[0]
     questions = call["questions"]
-    assert len(questions) == 2 * 4 + 2 + len(CHECKLIST)
+    assert len(questions) == 2 * 4 + 2 + 2 + len(CHECKLIST)  # STAR, flags, overall + verdict, Checklist
+    assert questions["answer2_flagged"]["type"] == "noul"
     assert questions["answer2_result"]["type"] == "score" and len(questions["answer2_result"]["criteria"]) == 5
     assert questions["overall"]["type"] == "score" and len(questions["overall"]["criteria"]) == 10
     assert set(questions["verdict"]["criteria"]) == {"strong_hire", "hire", "no_hire"}
     assert questions["check0"]["type"] == "noul"
 
-    assert "CANDIDATE (answer 2): Answer 2" in call["state"] and "Backend Engineer" in call["state"]
+    assert '<answer n="2">\nAnswer 2\n</answer>' in call["state"] and "Backend Engineer" in call["state"]
     assert CV not in call["state"] and "Head of Engineering" not in call["state"]  # no CV, no Persona
 
 

@@ -1,6 +1,6 @@
 # Security guards: spec
 
-Status: ready-for-agent
+Status: resolved
 Confirmed by the user on 2026-09-30 after a grilling session. Vocabulary in `CONTEXT.md` (Flagged Answer, Answer, Judge, STAR Breakdown, Evaluation, CV, Job Description). No formal course requirement; the aim is the guards a reviewer expects in an LLM app.
 
 ## Scope

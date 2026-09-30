@@ -72,6 +72,8 @@ class StarBreakdown(BaseModel):
     task: StarRating
     action: StarRating
     result: StarRating
+    # A Flagged Answer; missing in Evaluations from before the flag existed.
+    flagged: bool = False
 
 
 class EvaluationOut(BaseModel):

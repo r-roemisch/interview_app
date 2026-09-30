@@ -146,7 +146,7 @@ def test_dev_fake_answers_each_prompt_kind():
     assert q2 != q1
     closing = fake.complete([{"role": "system", "content": "interviewer"}, {"role": "system", "content": "Write a brief, courteous closing message"}])
     assert "Thank you" in closing
-    judge = json.loads(fake.complete([{"role": "system", "content": "You are an experienced hiring manager"}, {"role": "user", "content": "CANDIDATE (answer 1): x\n\nCANDIDATE (answer 2): y"}]))
+    judge = json.loads(fake.complete([{"role": "system", "content": "You are an experienced hiring manager"}, {"role": "user", "content": '<answer n="1">\nx\n</answer>\n\n<answer n="2">\ny\n</answer>'}]))
     assert len(judge["answers"]) == 2 and judge["verdict"] == "hire"
     persona = json.loads(fake.complete([{"role": "system", "content": "You invent the interviewer"}, {"role": "user", "content": "Job: x"}]))
     assert persona == {"name": "Sam Taylor", "title": "Engineering Manager", "voice": "ash"}

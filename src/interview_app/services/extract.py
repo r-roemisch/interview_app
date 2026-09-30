@@ -14,6 +14,10 @@ from pypdf import PdfReader
 log = logging.getLogger(__name__)
 
 MAX_PDF_BYTES = 5 * 1024 * 1024
+# Longer PDFs are read in part (spec: security-guards C1, C2): the pages that fit, and the text up
+# to the CV and Job Description field limit, so a long PDF can no longer make Start fail.
+MAX_PDF_PAGES = 30
+MAX_TEXT_CHARS = 20_000
 PDF_CONTENT_TYPES = {"application/pdf", "application/x-pdf", "application/octet-stream"}
 
 
@@ -29,13 +33,15 @@ def check_upload(content_type: str | None, data: bytes) -> None:
         raise PdfTextError("Only PDF files can be uploaded.")
 
 
-def extract_text(data: bytes) -> str:
+def extract_text(data: bytes) -> tuple[str, bool]:
+    """The PDF's text, and whether it was cut to fit."""
     try:
         reader = PdfReader(io.BytesIO(data))
         # Many PDFs are "encrypted" with an empty password and open normally; others cannot be read.
         if reader.is_encrypted and not reader.decrypt(""):
             raise PdfTextError("This PDF could not be read. Paste the text instead.")
-        pages = [page.extract_text() or "" for page in reader.pages]
+        truncated = len(reader.pages) > MAX_PDF_PAGES
+        pages = [page.extract_text() or "" for page in reader.pages[:MAX_PDF_PAGES]]
     except PdfTextError:
         raise
     except Exception as exc:  # pypdf raises many different errors for broken files
@@ -47,4 +53,13 @@ def extract_text(data: bytes) -> str:
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     if not text:
         raise PdfTextError("No text found in this PDF. Paste the text instead.")
-    return text
+    if len(text) > MAX_TEXT_CHARS:
+        text, truncated = _cut(text), True
+    return text, truncated
+
+
+def _cut(text: str) -> str:
+    """Cut at the last line break near the limit, so the kept text does not end mid-sentence."""
+    head = text[:MAX_TEXT_CHARS]
+    line_break = head.rfind("\n")
+    return (head[:line_break] if line_break > MAX_TEXT_CHARS - 500 else head).rstrip()

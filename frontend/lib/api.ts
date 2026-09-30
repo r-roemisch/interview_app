@@ -74,6 +74,7 @@ export interface StarBreakdown {
   task: StarRating;
   action: StarRating;
   result: StarRating;
+  flagged: boolean; // a Flagged Answer: scored as no answer (CONTEXT.md)
 }
 
 export interface Evaluation {
@@ -159,7 +160,8 @@ export const api = {
   extractText: (file: File) => {
     const form = new FormData();
     form.append("file", file);
-    return request<{ text: string }>("/extract-text", { method: "POST", body: form });
+    // `truncated`: the PDF was too long and only its first part was kept.
+    return request<{ text: string; truncated: boolean }>("/extract-text", { method: "POST", body: form });
   },
 
   // A recorded Answer as text. The backend reads the format from the Blob's type (audio/wav, see lib/wav.ts).

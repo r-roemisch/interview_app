@@ -141,6 +141,8 @@ class DevFakeJevClient:
             elif q["type"] == "choice":
                 labels = list(q["criteria"])
                 answers[name] = {"type": "choice", "choice": labels[len(labels) // 2], "confidence": 0.7}
+            elif name.endswith("_flagged"):
+                answers[name] = {"type": "noul", "noul": 0.05}  # never flag an Answer in dev
             else:
                 answers[name] = {"type": "noul", "noul": round(0.2 + 0.1 * (i % 8), 2)}
         return answers

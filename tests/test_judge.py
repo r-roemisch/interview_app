@@ -64,7 +64,7 @@ def test_valid_judge_output_completes_interview(client, llm, db):
     assert judge_call["json_schema"]["title"] == "JudgeOutput"
     user = judge_call["messages"][1]["content"]
     assert "Data Analyst" in user
-    assert "CANDIDATE (answer 2): A2" in user
+    assert '<answer n="2">\nA2\n</answer>' in user
     assert "`answers` must have 2 entries" in user
 
 

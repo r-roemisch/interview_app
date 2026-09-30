@@ -21,6 +21,14 @@ AUDIO_FORMATS = {
 }
 
 
+def _looks_like(audio_format: str, audio: bytes) -> bool:
+    """The file's first bytes must match the declared type, not just the header the browser sent."""
+    if audio_format == "wav":
+        return audio[:4] == b"RIFF" and audio[8:12] == b"WAVE"
+    # MP3: an ID3 tag, or straight into an MPEG frame (11 sync bits set).
+    return audio[:3] == b"ID3" or (len(audio) > 1 and audio[0] == 0xFF and audio[1] & 0xE0 == 0xE0)
+
+
 @router.get("/interviews/{interview_id}/messages/{message_id}/speech")
 def speak_message(
     message_id: int,
@@ -29,7 +37,8 @@ def speak_message(
 ) -> Response:
     """A Question or the Closing spoken in the Persona's voice. Generated on request, never stored."""
     message = next((m for m in interview.messages if m.id == message_id), None)
-    if message is None or message.role == MessageRole.ANSWER:
+    # Only a Voice Interview is spoken: nothing else may cause a paid speech call (spec: C4).
+    if not interview.voice_interview or message is None or message.role == MessageRole.ANSWER:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No interviewer message with this id")
     try:
         audio = speech.speak(message.text, interview.persona_voice)
@@ -52,6 +61,8 @@ def transcribe(file: UploadFile = File(...), speech: SpeechClient = Depends(get_
     audio = file.file.read(MAX_AUDIO_BYTES + 1)
     if len(audio) > MAX_AUDIO_BYTES:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "The recording is larger than 25 MB.")
+    if not _looks_like(audio_format, audio):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "This audio format is not supported.")
     try:
         return Transcription(text=speech.transcribe(audio, audio_format))
     except LLMUnavailable as exc:

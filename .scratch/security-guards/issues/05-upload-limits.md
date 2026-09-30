@@ -1,6 +1,6 @@
 # 05 Upload limits: long PDFs, audio check, speech only for Voice (backend + frontend)
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: none
 
 See spec "C1 + C2", "C3", "C4", "Tests".
@@ -14,3 +14,4 @@ See spec "C1 + C2", "C3", "C4", "Tests".
 Done when the C tests pass, the suite is green, tsc/lint/build pass, and the notice shows in the browser for a long PDF.
 
 ## Comments
+- 2026-09-30: Done. `MAX_PDF_PAGES = 30`, `MAX_TEXT_CHARS = 20_000`, cut at a line break within the last 500 characters; `ExtractedText.truncated`; the amber notice under the Job description or CV, cleared on edit. WAV/MP3 first-byte check on `/transcriptions`; speech 404 for written Interviews. Tests in `test_extract.py` (3) and `test_speech.py` (updated to real headers, 5 new). Checked in the browser: a 12-page PDF kept 19,948 characters and showed the notice. README agent section: a "Guards" paragraph.

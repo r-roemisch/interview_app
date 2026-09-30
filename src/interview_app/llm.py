@@ -173,8 +173,7 @@ class DevFakeLLMClient:
         system = messages[0]["content"] if messages else ""
         last = messages[-1]["content"] if messages else ""
         if "hiring manager" in system:
-            answers = sum(1 for m in messages if m["role"] == "user" and "CANDIDATE (answer" in m["content"])
-            answers = max(answers, last.count("CANDIDATE (answer"))
+            answers = sum(m["content"].count("<answer n=") for m in messages if m["role"] == "user")
             rating = {"rating": 3, "comment": "Some structure, but the outcome is not quantified."}
             return json.dumps(
                 {

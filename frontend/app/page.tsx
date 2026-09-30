@@ -18,6 +18,8 @@ export default function SetupPage() {
   const [jobDescription, setJobDescription] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("normal");
   const [demeanor, setDemeanor] = useState<Demeanor>("friendly");
+  // Which document came from a PDF that was cut to fit; cleared when that text changes.
+  const [cut, setCut] = useState<{ jobDescription: boolean; cv: boolean }>({ jobDescription: false, cv: false });
   // Recommend settings sits below the fields it fills, so it scrolls them back into view.
   const settingsRef = useRef<HTMLElement>(null);
   const [cv, setCv] = useState("");
@@ -157,17 +159,28 @@ export default function SetupPage() {
               <textarea
                 className={`${inputClass} min-h-36`}
                 value={jobDescription}
-                onChange={(e) => setJobDescription(e.target.value)}
+                onChange={(e) => {
+                  setJobDescription(e.target.value);
+                  setCut((c) => ({ ...c, jobDescription: false }));
+                }}
                 maxLength={20000}
                 placeholder="Paste the job posting here"
               />
             </Field>
+            {cut.jobDescription && <TruncatedNotice />}
             <div className="flex items-center gap-3">
               <Button type="button" variant="secondary" onClick={recommend} disabled={busy || !jobDescription.trim()}>
                 <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                 Recommend settings
               </Button>
-              <PdfUpload onText={setJobDescription} onError={setError} disabled={busy} />
+              <PdfUpload
+                onText={(text, truncated) => {
+                  setJobDescription(text);
+                  setCut((c) => ({ ...c, jobDescription: truncated }));
+                }}
+                onError={setError}
+                disabled={busy}
+              />
               {recommending && <Spinner label="Reading the posting..." />}
             </div>
           </section>
@@ -176,12 +189,23 @@ export default function SetupPage() {
               <textarea
                 className={`${inputClass} min-h-28`}
                 value={cv}
-                onChange={(e) => setCv(e.target.value)}
+                onChange={(e) => {
+                  setCv(e.target.value);
+                  setCut((c) => ({ ...c, cv: false }));
+                }}
                 maxLength={20000}
                 placeholder="Paste your CV here"
               />
             </Field>
-            <PdfUpload onText={setCv} onError={setError} disabled={busy} />
+            {cut.cv && <TruncatedNotice />}
+            <PdfUpload
+              onText={(text, truncated) => {
+                setCv(text);
+                setCut((c) => ({ ...c, cv: truncated }));
+              }}
+              onError={setError}
+              disabled={busy}
+            />
           </section>
         </div>
 
@@ -198,6 +222,15 @@ export default function SetupPage() {
   );
 }
 
+// Shown under a document whose PDF was longer than the backend reads (30 pages, 20,000 characters).
+function TruncatedNotice() {
+  return (
+    <p className="text-xs text-amber-700 dark:text-amber-400">
+      The PDF was longer than we can use; only the first part was kept.
+    </p>
+  );
+}
+
 // "Upload PDF" button: sends the file to the backend and hands back the extracted text.
 // The <label> wraps a hidden file input, so clicking the label opens the file picker.
 function PdfUpload({
@@ -205,7 +238,7 @@ function PdfUpload({
   onError,
   disabled,
 }: {
-  onText: (text: string) => void;
+  onText: (text: string, truncated: boolean) => void;
   onError: (message: string | null) => void;
   disabled: boolean;
 }) {
@@ -218,7 +251,8 @@ function PdfUpload({
     onError(null);
     setUploading(true);
     try {
-      onText((await api.extractText(file)).text);
+      const { text, truncated } = await api.extractText(file);
+      onText(text, truncated);
     } catch (e) {
       onError(e instanceof ApiError ? e.message : "Could not read the PDF.");
     } finally {

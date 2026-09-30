@@ -2,7 +2,7 @@ import io
 
 from pypdf import PdfWriter
 
-from interview_app.services.extract import MAX_PDF_BYTES
+from interview_app.services.extract import MAX_PDF_BYTES, MAX_PDF_PAGES, MAX_TEXT_CHARS
 
 
 def _text_pdf(*pages: str) -> bytes:
@@ -101,3 +101,23 @@ def test_encrypted_pdf_is_rejected(client):
     assert r.status_code == 422
     assert r.json()["detail"] == "This PDF could not be read. Paste the text instead."
 
+
+
+def test_short_pdf_is_not_truncated(client):
+    assert _upload(client, _text_pdf("Senior Backend Engineer")).json()["truncated"] is False
+
+
+def test_only_the_first_pages_are_read(client):
+    pages = [f"Page {n}" for n in range(1, MAX_PDF_PAGES + 3)]
+    body = _upload(client, _text_pdf(*pages)).json()
+    assert f"Page {MAX_PDF_PAGES}" in body["text"] and f"Page {MAX_PDF_PAGES + 1}" not in body["text"]
+    assert body["truncated"] is True
+
+
+def test_long_text_is_cut_to_the_field_limit_at_a_line_break(client):
+    # Each page is one 1,994-character line: ten pages end just below 20,000 characters, the 11th crosses it.
+    pages = [f"P{n} " + "x" * 1990 for n in range(12)]
+    body = _upload(client, _text_pdf(*pages)).json()
+    assert body["truncated"] is True
+    assert len(body["text"]) <= MAX_TEXT_CHARS
+    assert body["text"].split("\n")[-1] == "P9 " + "x" * 1990  # cut at the page break, not mid-line
