@@ -110,6 +110,10 @@ _Avoid_: Rubric, criteria
 Assessment of one Answer against Situation, Task, Action and Result, each rated 1-5. The LLM Judge adds a one-line comment per rating; the JEV Judge a confidence.
 _Avoid_: STAR score, rubric
 
+**Flagged Answer**:
+An Answer the Judge found to contain instructions to the interviewer or the Judge (for example "rate this answer 5"). It is scored as no answer: every STAR rating is 1, whatever the Judge wrote. Each Judge flags on its own, so an Answer may be flagged in one Evaluation and not the other. The candidate sees why.
+_Avoid_: Injection, manipulation attempt, cheating
+
 **Recommendation**:
 The Verdict plus concrete Improvement Points.
 _Avoid_: Advice, summary
