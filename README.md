@@ -64,41 +64,6 @@ Blue: what you do. Amber: the guards. Grey: what the models do.
 
 ## Experiments
 
-<!-- Your findings. The tables are a starting point: fill in, add rows, delete what you don't need. -->
-
-### How I tested
-
-<!-- e.g. which job, difficulty and judge stayed the same, which answers you gave, how many interviews per combination -->
-
-### Interviewer models
-
-| Model | Price per 1M tokens (in / out) | Time per question | Quality of the questions | Average score | My verdict |
-|---|---|---|---|---|---|
-| GPT-4.1 Mini (baseline) | $0.40 / $1.60 | ~1 s | | | |
-| GPT-5 Nano (cheapest) | $0.05 / $0.40 | ~10 s | | | |
-| Claude Sonnet 5.5 (best) | $2 / $10 | ~2.5 s | | | |
-| Gemma 4 31B (open model) | $0.14 / $0.40 | ~2.5 s | | | |
-
-Times were measured once while building, on two questions per model.
-
-### Prompt styles
-
-| Prompt style | What the interviewer gets | What I noticed | Average score |
-|---|---|---|---|
-| Zero-shot | Only its rules | | |
-| One-shot | One example exchange | | |
-| Few-shot | Three example exchanges | | |
-| Chain-of-thought | Writes an assessment of the last answer before asking | | |
-| Plan-ahead | Plans 5 to 7 topics before the first question | | |
-| Self-check | Drafts the question, checks it, then asks the corrected one | | |
-
-### Security guards
-
-| Guard | What I tried | What happened |
-|---|---|---|
-| Off-topic answers | | |
-| Daily budget ($2) | | |
-
 ### Surprises
 
 Found while building:
@@ -108,10 +73,6 @@ Found while building:
 - The off-topic check with GPT-5 Nano got all six test answers right but takes 2 to 8 seconds. Made faster (less reasoning, or GPT-4.1 Nano), it also blocked weak but honest answers.
 
 <!-- your own surprises -->
-
-### Conclusion
-
-<!-- Which model and prompt style would you use, and why? -->
 
 ## Not in this version
 
