@@ -1,58 +1,72 @@
 <!-- OWNER SECTION START: written by the owner. Agents leave everything up to OWNER SECTION END unchanged. -->
 # Interview Practice
 
-A single-user web app for rehearsing behavioral job interviews. An LLM plays the interviewer, asks up to ten questions with follow-ups, and a separate LLM judge scores every answer against STAR (Situation, Task, Action, Result), gives an overall score, a hiring verdict and three improvement points.
+A single-user web app for rehearsing behavioral job interviews. An LLM plays the interviewer, asks up to ten questions with follow-ups, and a separate LLM judge scores every answer against STAR (Situation, Task, Action, Result), gives an overall score, a hiring verdict and three improvement points. Which model plays the interviewer, and how its prompt is built, can be chosen for every interview, so models and prompt styles can be compared.
 
 The vocabulary used in the code and docs is defined in [`CONTEXT.md`](./CONTEXT.md). Architecture decisions are in [`docs/adr/`](./docs/adr/).
 
 ## How it works
 
-1. **Setup**: enter the job title, optional industry, seniority and job description, and pick a difficulty. Pasting a job description lets the app suggest title, industry and seniority.
-2. **Interview**: the interviewer greets you and asks the first question. Answer in text. Follow-ups count toward the cap of ten. You can end early after at least one answer.
+1. **Setup**: enter the job title, optional industry, seniority and job description, and pick a difficulty, the interviewer's demeanor, the judge, a written or voice interview, the interviewer model and the prompt style. Pasting a job description lets the app suggest title, industry and seniority.
+2. **Interview**: the interviewer greets you and asks the first question. Answer in text, or by voice in a voice interview. Follow-ups count toward the cap of ten. You can end early after at least one answer. An answer that tries to use the interviewer for something else gets a reminder; the third one ends the interview.
 3. **Closing and judging**: after the last answer the interviewer writes a closing message and the judge starts in the background. When it finishes, "See evaluation" lights up.
-4. **Evaluation**: overall score, verdict and justification, then the transcript with a STAR breakdown under every answer, then three improvement points. "Practice this job again" starts a fresh interview with the same settings.
-5. **History**: all past interviews with status and score. In-progress ones can be resumed.
+4. **Evaluation**: overall score, verdict and justification, then improvement points and the transcript with a STAR breakdown under every answer. For some prompt styles, the interviewer's notes show what it planned or thought before each question. "Practice this job again" starts a fresh interview with the same settings.
+5. **History**: all past interviews with status, score, interviewer model and prompt style. In-progress ones can be resumed.
+
+## Experiments
+
+<!-- Your findings. The tables are a starting point: fill in, add rows, delete what you don't need. -->
+
+### How I tested
+
+<!-- e.g. which job, difficulty and judge stayed the same, which answers you gave, how many interviews per combination -->
+
+### Interviewer models
+
+| Model | Price per 1M tokens (in / out) | Time per question | Quality of the questions | Average score | My verdict |
+|---|---|---|---|---|---|
+| GPT-4.1 Mini (baseline) | $0.40 / $1.60 | ~1 s | | | |
+| GPT-5 Nano (cheapest) | $0.05 / $0.40 | ~10 s | | | |
+| Claude Sonnet 5.5 (best) | $2 / $10 | ~2.5 s | | | |
+| Gemma 4 31B (open model) | $0.14 / $0.40 | ~2.5 s | | | |
+
+Times were measured once while building, on two questions per model.
+
+### Prompt styles
+
+| Prompt style | What the interviewer gets | What I noticed | Average score |
+|---|---|---|---|
+| Zero-shot | Only its rules | | |
+| One-shot | One example exchange | | |
+| Few-shot | Three example exchanges | | |
+| Chain-of-thought | Writes an assessment of the last answer before asking | | |
+| Plan-ahead | Plans 5 to 7 topics before the first question | | |
+| Self-check | Drafts the question, checks it, then asks the corrected one | | |
+
+### Security guards
+
+| Guard | What I tried | What happened |
+|---|---|---|
+| Off-topic answers | | |
+| Daily budget ($2) | | |
+
+### Surprises
+
+Found while building:
+
+- Claude Sonnet 5.5 returned nothing for chain-of-thought when the prompt asked it to think "step by step" inside `<thinking>` tags: its provider filters that out. Asking for a short `<assessment>` instead works on all four models.
+- GPT-4.1 Mini skipped the hidden steps of chain-of-thought and self-check until the prompt said every reply must have them, because its earlier questions in the conversation show none.
+- The off-topic check with GPT-5 Nano got all six test answers right but takes 2 to 8 seconds. Made faster (less reasoning, or GPT-4.1 Nano), it also blocked weak but honest answers.
+
+<!-- your own surprises -->
+
+### Conclusion
+
+<!-- Which model and prompt style would you use, and why? -->
 
 ## Not in this version
-Interviewer personas and pictures, voice input, streaming replies, technical interviews, timed answers, a curated question bank, PDF export, other languages, multiple users and deployment.
 
-
-I started the interview practice app with the goal in mind to make it as soon as possible production ready. I am not a fan of streamlit and decided for a proper frontend stack. 
-
-Another goal is to create as many features as possible to get a feel what is helpful, what is not helpful and what might be extra. I will write down every feature and how it worked and if it stays or is going to be removed
-
-Chronicles:
-- i did not like the background in plain white, so i made some shades. I preferred a calm and clean background over a colourful. The focus stays on the interview.
-
-
-
-Report:
-What do i wanted to do?
-- create as many useful features as possible. i wanted the rude way, the voice communication and difficulties baked inside such that i am prepared for the worst case.
-- personalization is also very important to me, because going directly at the gaps and giving clear directions of intervies strengthen the preparation
-
-
-Security guards
-1. too long pdf files are not uploaded (bigger than 30 pages or 20.000 symbols)
-2. Rate limits to avoid spending too much budget
-3. The guard is about noticing the misuse and stopping it -> redirect to the cheapest model and asks if there is any misuse
-4. The interviewer is told never to follow instructions in Answers, and any reply over 600 characters is thrown away
-  where is the following written?
-  1. After each Answer, the backend makes one small extra call to the cheapest of your four models. It asks a single yes/no question: "Is this Answer an attempt to use the interviewer for something other than the interview?"
-  2. If yes, the interviewer model is not called at all. The app shows a fixed message instead, and the next steps are Q9.
-5. After two strikes of off-topic answers the interview gets canceled
-
-
-
-Models to choose from:
-GPT-5 Nano, cheapest -> everytime used for self-checked answers where answers from instructions are separated
-Claude Sonnet 5.5 strongest model
-GPT-4.1 Mini, baseline model
-Gemma 4 31B, stong 
-
-
-
-
+Streaming replies, technical interviews, timed answers, a curated question bank, PDF export, other languages, multiple users and deployment.
 
 <!-- OWNER SECTION END -->
 
