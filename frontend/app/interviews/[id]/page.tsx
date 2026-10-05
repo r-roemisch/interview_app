@@ -1,10 +1,22 @@
 "use client";
 
-import { ArrowUp, ChevronDown, ClipboardCheck, Flag, Loader2, Mic, RotateCw, Square, Volume2, VolumeX } from "lucide-react";
+import {
+  ArrowUp,
+  ChevronDown,
+  ClipboardCheck,
+  Flag,
+  Loader2,
+  Mic,
+  RotateCw,
+  ShieldAlert,
+  Square,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api, ApiError, speechUrl, type Interview, type Message } from "@/lib/api";
-import { DIFFICULTY_OPTIONS, SENIORITY_OPTIONS, STAR_PARTS } from "@/lib/labels";
+import { DIFFICULTY_OPTIONS, OFF_TOPIC_REMINDERS, SENIORITY_OPTIONS, STAR_PARTS } from "@/lib/labels";
 import { toWav } from "@/lib/wav";
 import { Button, cardClass, ErrorBanner, glassClass, Page, PersonaAvatar, Spinner, StarLetter } from "../../ui";
 
@@ -33,6 +45,9 @@ export default function InterviewPage() {
   // goes back into the Answer box, so nothing typed is lost.
   const [pending, setPending] = useState<string | null>(null);
   const [ending, setEnding] = useState(false);
+  // The off-topic reminder after the last Answer sent (1 or 2), from the app, not the interviewer.
+  // Never stored: a reload or the next accepted Answer clears it.
+  const [reminder, setReminder] = useState<number | null>(null);
   // What failed last, so Retry repeats the right action.
   const [failed, setFailed] = useState<{ message: string; action?: "send" | "end" } | null>(null);
   const [evaluation, setEvaluation] = useState<EvaluationState>("polling");
@@ -142,7 +157,12 @@ export default function InterviewPage() {
     setPending(text);
     setDraft("");
     try {
-      setInterview(await api.submitAnswer(interview.id, text));
+      const updated = await api.submitAnswer(interview.id, text);
+      setInterview(updated);
+      const offTopic = updated.status === "in_progress" && updated.off_topic_count > interview.off_topic_count;
+      setReminder(offTopic ? updated.off_topic_count : null);
+      // The Answer was not kept: leave it in the box, so a wrongly blocked one can be edited and sent again.
+      if (offTopic) setDraft(text);
     } catch (e) {
       setDraft(text);
       setFailed({ message: e instanceof ApiError ? e.message : "Could not send the answer.", action: "send" });
@@ -236,6 +256,12 @@ export default function InterviewPage() {
                 onPlay={interview.voice_interview ? () => play(audioRef, speechUrl(interview.id, m.id)) : undefined}
               />
             ))}
+            {reminder !== null && pending === null && (
+              <li className="flex items-start gap-2 rounded-xl border border-amber-200/70 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                {OFF_TOPIC_REMINDERS[reminder - 1]}
+              </li>
+            )}
             {pending !== null && <AnswerBlock text={pending} dim />}
             {busy && (
               <li className="rounded-xl border border-dashed border-zinc-300 bg-white/50 px-4 py-4 dark:border-zinc-700 dark:bg-zinc-900/40">

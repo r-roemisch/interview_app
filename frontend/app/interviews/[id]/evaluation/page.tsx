@@ -1,9 +1,19 @@
 "use client";
 
-import { History, RotateCcw, RotateCw, Scale, Scale3d, TriangleAlert } from "lucide-react";
+import { ChevronRight, History, NotebookPen, RotateCcw, RotateCw, Scale, Scale3d, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { api, ApiError, type Evaluation, type Interview, type Judge, type Message, type StarBreakdown, type Verdict } from "@/lib/api";
+import {
+  api,
+  ApiError,
+  type Evaluation,
+  type Interview,
+  type InterviewerNotes,
+  type Judge,
+  type Message,
+  type StarBreakdown,
+  type Verdict,
+} from "@/lib/api";
 import {
   confidenceLevel,
   DIFFICULTY_OPTIONS,
@@ -196,6 +206,8 @@ export default function EvaluationPage() {
           </>
         )}
 
+        <NotesSection interviewId={interview.id} messages={interview.messages} />
+
         <footer className="flex flex-wrap items-center gap-3 border-t border-zinc-200/70 pt-6 dark:border-zinc-800/70">
           <Button onClick={practiceAgain} disabled={busy}>
             <RotateCcw className="h-4 w-4" />
@@ -209,6 +221,51 @@ export default function EvaluationPage() {
         </footer>
       </div>
     </Page>
+  );
+}
+
+// The Interviewer's Notes: the plan, assessments and drafts some Prompt Styles write (CONTEXT.md).
+// Collapsed, and hidden when there are none or they cannot be loaded: they are extra, not the Evaluation.
+function NotesSection({ interviewId, messages }: { interviewId: number; messages: Message[] }) {
+  const [notes, setNotes] = useState<InterviewerNotes | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getNotes(interviewId)
+      .then((n) => !cancelled && setNotes(n))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [interviewId]);
+
+  if (!notes || (!notes.plan && notes.messages.length === 0)) return null;
+  const byId = new Map(messages.map((m) => [m.id, m]));
+  return (
+    <details className={`group rounded-2xl ${cardClass}`}>
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-4 font-semibold">
+        <ChevronRight className="h-4 w-4 text-zinc-400 transition-transform group-open:rotate-90" />
+        <NotebookPen className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+        Interviewer&apos;s notes
+        <span className="text-sm font-normal text-zinc-600 dark:text-zinc-400">what the interviewer wrote but you never saw</span>
+      </summary>
+      <div className="space-y-5 border-t border-zinc-200/70 px-5 py-4 dark:border-zinc-800/70">
+        {notes.plan && (
+          <div>
+            <p className="mb-1 text-sm font-medium">Plan for the interview</p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{notes.plan}</p>
+          </div>
+        )}
+        {notes.messages.map((n) => (
+          <div key={n.message_id}>
+            <p className="mb-1 text-sm font-medium">{byId.get(n.message_id)?.text}</p>
+            <p className="whitespace-pre-wrap rounded-lg bg-zinc-50 px-3 py-2 text-sm leading-relaxed text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400">
+              {n.notes}
+            </p>
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 

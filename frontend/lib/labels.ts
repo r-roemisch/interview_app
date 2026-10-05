@@ -1,4 +1,4 @@
-import type { Demeanor, Difficulty, InterviewStatus, Judge, Seniority, Verdict } from "./api";
+import type { Demeanor, Difficulty, InterviewerModel, InterviewStatus, Judge, PromptStyle, Seniority, Verdict } from "./api";
 
 export const STATUS_LABEL: Record<InterviewStatus, string> = {
   in_progress: "In progress",
@@ -41,6 +41,40 @@ export const MODE_OPTIONS: { value: "written" | "voice"; label: string; hint: st
 ];
 
 export const JUDGE_LABEL: Record<Judge, string> = { llm: "LLM", jev: "JEV" };
+
+// Setup choices for trying out models and prompts (spec: interviewer-experiments).
+export const INTERVIEWER_MODEL_OPTIONS: { value: InterviewerModel; label: string; hint: string }[] = [
+  { value: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", hint: "Baseline: the model used so far, no built-in reasoning" },
+  { value: "openai/gpt-5-nano", label: "GPT-5 Nano", hint: "Cheapest, but slow: it reasons before every reply" },
+  { value: "anthropic/claude-sonnet-5.5", label: "Claude Sonnet 5.5", hint: "Best, and the most expensive" },
+  { value: "google/gemma-4-31b-it", label: "Gemma 4 31B", hint: "Open model you could run yourself" },
+];
+
+export const PROMPT_STYLE_OPTIONS: { value: PromptStyle; label: string; hint: string }[] = [
+  { value: "zero_shot", label: "Zero-shot", hint: "The interviewer gets only its rules." },
+  { value: "one_shot", label: "One-shot", hint: "The interviewer also gets one example exchange." },
+  { value: "few_shot", label: "Few-shot", hint: "The interviewer also gets three example exchanges." },
+  { value: "chain_of_thought", label: "Chain-of-thought", hint: "The interviewer thinks about your last answer before asking." },
+  { value: "plan_ahead", label: "Plan-ahead", hint: "The interviewer plans the topics of the interview first, then follows the plan." },
+  {
+    value: "self_check",
+    label: "Self-check",
+    hint: "The interviewer drafts each question, checks it against its rules, then asks the corrected one.",
+  },
+];
+
+// After the first and second Off-topic Answer; the third ends the Interview (CONTEXT.md: Off-topic Answer).
+export const OFF_TOPIC_REMINDERS = [
+  "Let's stay with the interview. Please answer the question.",
+  "Last reminder: one more answer like that ends the interview.",
+];
+
+// "GPT-4.1 Mini · Few-shot", for History rows.
+export function experimentLabel(model: InterviewerModel, style: PromptStyle): string {
+  const modelLabel = INTERVIEWER_MODEL_OPTIONS.find((o) => o.value === model)?.label ?? model;
+  const styleLabel = PROMPT_STYLE_OPTIONS.find((o) => o.value === style)?.label ?? style;
+  return `${modelLabel} · ${styleLabel}`;
+}
 
 // Shown on Setup and on a JEV Evaluation (spec: judge-choice).
 export const JEV_EXPLANATION =

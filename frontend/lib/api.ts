@@ -5,6 +5,13 @@ export type Seniority = "junior" | "mid" | "senior";
 export type Difficulty = "easy" | "normal" | "hard";
 export type Demeanor = "friendly" | "rude";
 export type Judge = "llm" | "jev";
+// The four Interviewer Models; must match INTERVIEWER_MODELS in src/interview_app/models.py.
+export type InterviewerModel =
+  | "openai/gpt-4.1-mini"
+  | "openai/gpt-5-nano"
+  | "anthropic/claude-sonnet-5.5"
+  | "google/gemma-4-31b-it";
+export type PromptStyle = "zero_shot" | "one_shot" | "few_shot" | "chain_of_thought" | "plan_ahead" | "self_check";
 export type InterviewStatus = "in_progress" | "judging" | "completed" | "evaluation_missing";
 export type MessageRole = "question" | "answer" | "closing";
 export type Verdict = "strong_hire" | "hire" | "no_hire";
@@ -27,6 +34,8 @@ export interface Interview {
   difficulty: Difficulty;
   demeanor: Demeanor;
   judge: Judge;
+  interviewer_model: InterviewerModel;
+  prompt_style: PromptStyle;
   persona_name: string;
   persona_title: string;
   persona_voice: string;
@@ -34,6 +43,7 @@ export interface Interview {
   portrait: PortraitState;
   status: InterviewStatus;
   ended_early: boolean;
+  off_topic_count: number; // Off-topic Answers so far; the third ends the Interview
   created_at: string;
   question_count: number;
   question_cap: number;
@@ -49,6 +59,8 @@ export interface InterviewCreate {
   demeanor: Demeanor;
   cv?: string | null;
   judge: Judge;
+  interviewer_model: InterviewerModel;
+  prompt_style: PromptStyle;
   voice_interview: boolean;
   portrait: boolean;
 }
@@ -59,7 +71,15 @@ export interface HistoryRow {
   created_at: string;
   status: InterviewStatus;
   judge: Judge;
+  interviewer_model: InterviewerModel;
+  prompt_style: PromptStyle;
   overall_score: number | null;
+}
+
+// The Interviewer's Notes of an ended Interview (CONTEXT.md); only messages that have notes.
+export interface InterviewerNotes {
+  plan: string | null;
+  messages: { message_id: number; notes: string }[];
 }
 
 export interface StarRating {
@@ -181,6 +201,7 @@ export const api = {
   listEvaluations: (id: number) => request<Evaluation[]>(`/interviews/${id}/evaluations`),
   runJudge: (id: number, judge: Judge) =>
     request<Evaluation>(`/interviews/${id}/evaluations/${judge}`, { method: "POST" }),
+  getNotes: (id: number) => request<InterviewerNotes>(`/interviews/${id}/notes`),
   rerunEvaluation: (id: number) =>
     request<Interview>(`/interviews/${id}/evaluation/rerun`, { method: "POST" }),
 

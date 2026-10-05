@@ -3,11 +3,30 @@
 import { FileUp, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, ApiError, type Demeanor, type Difficulty, type Judge, type Seniority } from "@/lib/api";
-import { DEMEANOR_OPTIONS, DIFFICULTY_OPTIONS, JEV_EXPLANATION, JUDGE_OPTIONS, MODE_OPTIONS, SENIORITY_OPTIONS } from "@/lib/labels";
+import {
+  api,
+  ApiError,
+  type Demeanor,
+  type Difficulty,
+  type InterviewerModel,
+  type Judge,
+  type PromptStyle,
+  type Seniority,
+} from "@/lib/api";
+import {
+  DEMEANOR_OPTIONS,
+  DIFFICULTY_OPTIONS,
+  INTERVIEWER_MODEL_OPTIONS,
+  JEV_EXPLANATION,
+  JUDGE_OPTIONS,
+  MODE_OPTIONS,
+  PROMPT_STYLE_OPTIONS,
+  SENIORITY_OPTIONS,
+} from "@/lib/labels";
 import { Button, cardClass, ErrorBanner, Field, inputClass, Page, Spinner } from "./ui";
 
-// Setup page: describe the Job, pick Difficulty, Demeanor and Judge, start an Interview.
+// Setup page: describe the Job, pick Difficulty, Demeanor, Judge, Interviewer model and Prompt style,
+// start an Interview.
 export default function SetupPage() {
   const router = useRouter();
 
@@ -24,6 +43,8 @@ export default function SetupPage() {
   const settingsRef = useRef<HTMLElement>(null);
   const [cv, setCv] = useState("");
   const [judge, setJudge] = useState<Judge>("llm");
+  const [interviewerModel, setInterviewerModel] = useState<InterviewerModel>("openai/gpt-4.1-mini");
+  const [promptStyle, setPromptStyle] = useState<PromptStyle>("zero_shot");
   const [mode, setMode] = useState<"written" | "voice">("written");
   const [portrait, setPortrait] = useState(true);
 
@@ -70,6 +91,8 @@ export default function SetupPage() {
         demeanor,
         cv: cv.trim() || null,
         judge,
+        interviewer_model: interviewerModel,
+        prompt_style: promptStyle,
         voice_interview: mode === "voice",
         portrait,
       });
@@ -149,6 +172,32 @@ export default function SetupPage() {
                 {JEV_EXPLANATION}
               </p>
             )}
+          </div>
+
+          {/* For comparing models and prompts (spec: interviewer-experiments). Only the interviewer changes. */}
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field label="Interviewer model" hint={INTERVIEWER_MODEL_OPTIONS.find((o) => o.value === interviewerModel)?.hint}>
+              <select
+                className={inputClass}
+                value={interviewerModel}
+                onChange={(e) => setInterviewerModel(e.target.value as InterviewerModel)}
+              >
+                {INTERVIEWER_MODEL_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Prompt style" hint={PROMPT_STYLE_OPTIONS.find((o) => o.value === promptStyle)?.hint}>
+              <select className={inputClass} value={promptStyle} onChange={(e) => setPromptStyle(e.target.value as PromptStyle)}>
+                {PROMPT_STYLE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </div>
         </section>
 
