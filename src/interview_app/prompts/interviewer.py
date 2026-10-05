@@ -1,11 +1,12 @@
-"""Interviewer prompt. Difficulty definitions mirror CONTEXT.md."""
+"""Interviewer prompt. Difficulty definitions mirror CONTEXT.md; the Prompt Styles follow
+.scratch/interviewer-experiments/spec.md."""
 
 from __future__ import annotations
 
 import re
 
 from interview_app.llm import Message
-from interview_app.models import QUESTION_CAP, Demeanor, Difficulty, Interview, MessageRole
+from interview_app.models import QUESTION_CAP, Demeanor, Difficulty, Interview, MessageRole, PromptStyle
 from interview_app.prompts.untrusted import untrusted
 
 _DIFFICULTY_RULES = {
@@ -77,6 +78,69 @@ _CLOSING_LAST = (
 )
 
 
+# Prompt Styles (CONTEXT.md: Prompt Style). Zero-shot adds nothing. Example Answers and replies are in
+# double quotes, so the reply check never treats them as instructions (see _instruction_sentences).
+_EXAMPLES_INTRO = "These examples show the style of a good reply. Never copy them."
+_EXAMPLES = {
+    Difficulty.EASY: (
+        '"I led the migration of our billing system to a new provider."',
+        '"Thanks. Tell me about a time you had to work with a difficult colleague."',
+    ),
+    Difficulty.NORMAL: (
+        '"We usually just talk it out as a team."',
+        '"Can you give me one specific time this happened, and what you did?"',
+    ),
+    Difficulty.HARD: (
+        '"I improved the performance of our API a lot."',
+        '"By how much, how did you measure it, and what did you personally change rather than the team?"',
+    ),
+}
+# Not "<thinking>", "step by step" or "your earlier messages show none": Claude's content filter
+# blocks the reply when asked in those words (checked 2026-10-05).
+_CHAIN_OF_THOUGHT_RULE = (
+    "Every reply you write starts with a short assessment inside <assessment> and </assessment>: which "
+    "parts of the last answer (Situation, Task, Action, Result) were clear or missing, whether your "
+    "difficulty allows a follow-up, and what to ask next. After </assessment>, write only your message "
+    "to the candidate."
+)
+_SELF_CHECK_RULE = (
+    "Every reply you write has three parts, even though your earlier messages show only the last one: "
+    "the candidate sees only that. First, a draft of your message inside <draft> and </draft>. Second, "
+    "a check of the draft with one line per question, each answered yes or no: is it exactly one "
+    "question, at most three sentences, right for your difficulty, and not asked before? Third, the "
+    "corrected message inside <final> and </final>."
+)
+_PLAN_INTRO = "Your plan for this interview. Follow it, but a follow-up comes first when an answer needs one:"
+_PLAN_REQUEST = (
+    "Before the interview starts, plan it: list 5 to 7 topics you will cover, in order, one line each, "
+    "each with why it fits the job. Write only the list."
+)
+MAX_PLAN_CHARS = 1_500
+MAX_NOTES_CHARS = 4_000
+
+
+def _examples_block(interview: Interview) -> list[str]:
+    difficulties = [interview.difficulty] if interview.prompt_style == PromptStyle.ONE_SHOT else list(_EXAMPLES)
+    lines = ["Examples:", _EXAMPLES_INTRO]
+    for difficulty in difficulties:
+        answer, reply = _EXAMPLES[difficulty]
+        lines.append(f"- {difficulty.value.upper()} difficulty. Candidate: {answer} You: {reply}")
+    return lines
+
+
+def _prompt_style_block(interview: Interview) -> list[str]:
+    style = interview.prompt_style
+    if style in (PromptStyle.ONE_SHOT, PromptStyle.FEW_SHOT):
+        return _examples_block(interview)
+    if style == PromptStyle.CHAIN_OF_THOUGHT:
+        return [_CHAIN_OF_THOUGHT_RULE]
+    if style == PromptStyle.SELF_CHECK:
+        return [_SELF_CHECK_RULE]
+    if style == PromptStyle.PLAN_AHEAD and interview.plan:
+        return [_PLAN_INTRO, "<plan>", untrusted(interview.plan).strip(), "</plan>"]
+    return []
+
+
 def build_system_prompt(interview: Interview) -> str:
     industry = f" in the {untrusted(interview.industry)} industry" if interview.industry else ""
     parts = [
@@ -86,6 +150,7 @@ def build_system_prompt(interview: Interview) -> str:
         *([_RUDE_RULE] if interview.demeanor == Demeanor.RUDE else []),
         "Rules:",
         *_RULES,
+        *_prompt_style_block(interview),
     ]
     if interview.job_description:
         parts += [
@@ -134,6 +199,14 @@ def messages_for_next_question(interview: Interview) -> list[Message]:
     return msgs
 
 
+def messages_for_plan(interview: Interview) -> list[Message]:
+    """Plan-ahead: one call before the first Question; the plan goes into every later prompt."""
+    return [
+        {"role": "system", "content": build_system_prompt(interview)},
+        {"role": "user", "content": _PLAN_REQUEST},
+    ]
+
+
 def messages_for_closing(interview: Interview, *, ended_early: bool) -> list[Message]:
     msgs: list[Message] = [{"role": "system", "content": build_system_prompt(interview)}]
     msgs.extend(_transcript(interview))
@@ -144,12 +217,13 @@ def messages_for_closing(interview: Interview, *, ended_early: bool) -> list[Mes
 # Reply check (spec: security-guards B1). A Question or Closing longer than this, or repeating a
 # sentence of the interviewer's own instructions, is asked for again, then replaced by a fallback.
 MAX_REPLY_CHARS = 600
-_TAGS = re.compile(r"<\s*/?\s*(?:cv|job_description|answer)\b", re.IGNORECASE)
+_TAGS = re.compile(r"<\s*/?\s*(?:cv|job_description|answer|plan|assessment|thinking|draft|final)\b", re.IGNORECASE)
 
 
 def _instruction_sentences() -> list[str]:
     texts = [*_RULES, *_DIFFICULTY_RULES.values(), _RUDE_RULE, *_CV_RULES.values()]
     texts += [_JOB_DESCRIPTION_INTRO, _CV_INTRO, _CLOSING_EARLY, _CLOSING_LAST]
+    texts += [_EXAMPLES_INTRO, _CHAIN_OF_THOUGHT_RULE, _SELF_CHECK_RULE, _PLAN_INTRO, _PLAN_REQUEST]
     sentences = []
     for text in texts:
         # Quoted examples ("Fine. Next.") are things the interviewer may really say.
@@ -163,8 +237,35 @@ def _instruction_sentences() -> list[str]:
 _INSTRUCTION_SENTENCES = _instruction_sentences()
 
 
+_ASSESSMENT = re.compile(r"<assessment>(.*?)</assessment>", re.IGNORECASE | re.DOTALL)
+_FINAL = re.compile(r"<final>(.*?)(?:</final>|$)", re.IGNORECASE | re.DOTALL)
+_DRAFT_TAGS = re.compile(r"</?draft>", re.IGNORECASE)
+
+
+def split_reply(style: PromptStyle, reply: str) -> tuple[str, str | None]:
+    """The message the candidate sees and the Interviewer's Notes behind it. A malformed reply
+    (unclosed <assessment>, no <final>) gives an empty message, which reply_problem rejects."""
+    notes: str | None = None
+    if style == PromptStyle.CHAIN_OF_THOUGHT:
+        notes = "\n\n".join(t.strip() for t in _ASSESSMENT.findall(reply)) or None
+        reply = _ASSESSMENT.sub("", reply)
+        if re.search(r"<assessment>", reply, re.IGNORECASE):
+            return "", notes
+    elif style == PromptStyle.SELF_CHECK:
+        final = _FINAL.search(reply)
+        if final is None:
+            return "", None
+        notes = _DRAFT_TAGS.sub("", reply[: final.start()]).strip() or None
+        reply = final.group(1)
+    if notes:
+        notes = notes[:MAX_NOTES_CHARS]
+    return reply.strip(), notes
+
+
 def reply_problem(reply: str) -> str | None:
     """Why the interviewer's reply cannot be shown, or None when it is fine."""
+    if not reply:
+        return "empty"
     if len(reply) > MAX_REPLY_CHARS:
         return f"longer than {MAX_REPLY_CHARS} characters"
     lowered = reply.lower()

@@ -38,11 +38,14 @@ class LLMUnavailable(Exception):
 
 
 class LLMClient(Protocol):
-    def complete(self, messages: list[Message], *, json_schema: dict[str, Any] | None = None) -> str:
+    def complete(
+        self, messages: list[Message], *, json_schema: dict[str, Any] | None = None, model: str | None = None
+    ) -> str:
         """Return the assistant's text for the given conversation.
 
         When `json_schema` is given the model is asked to produce JSON matching it.
         Callers must still validate the result: free models do not always comply.
+        `model` overrides the client's own model for this call (the Interviewer Model).
         """
         ...
 
@@ -88,8 +91,11 @@ class OpenRouterClient:
             api_key=api_key, base_url=base_url, max_retries=0, timeout=timeout_seconds
         )
 
-    def complete(self, messages: list[Message], *, json_schema: dict[str, Any] | None = None) -> str:
-        kwargs: dict[str, Any] = {"model": self.model, "messages": messages}
+    def complete(
+        self, messages: list[Message], *, json_schema: dict[str, Any] | None = None, model: str | None = None
+    ) -> str:
+        model = model or self.model
+        kwargs: dict[str, Any] = {"model": model, "messages": messages}
         if json_schema is not None:
             # strict=False: OpenAI's strict mode rejects schemas with optional fields or
             # min/max constraints, which our Pydantic models have. The reply is validated
@@ -101,7 +107,7 @@ class OpenRouterClient:
 
         response = call_with_retries(
             lambda: self._client.chat.completions.create(**kwargs),
-            model=self.model,
+            model=model,
             max_retries=self.max_retries,
             backoff_seconds=self.backoff_seconds,
             sleep=self._sleep,
@@ -140,8 +146,10 @@ class FakeLLMClient:
     responses: list[str | Exception] = field(default_factory=list)
     calls: list[dict[str, Any]] = field(default_factory=list)
 
-    def complete(self, messages: list[Message], *, json_schema: dict[str, Any] | None = None) -> str:
-        self.calls.append({"messages": messages, "json_schema": json_schema})
+    def complete(
+        self, messages: list[Message], *, json_schema: dict[str, Any] | None = None, model: str | None = None
+    ) -> str:
+        self.calls.append({"messages": messages, "json_schema": json_schema, "model": model})
         if not self.responses:
             raise AssertionError("FakeLLMClient has no responses left")
         nxt = self.responses.pop(0)
@@ -167,7 +175,9 @@ class DevFakeLLMClient:
         "What is a decision you made with incomplete information, and how did it turn out?",
     ]
 
-    def complete(self, messages: list[Message], *, json_schema: dict[str, Any] | None = None) -> str:
+    def complete(
+        self, messages: list[Message], *, json_schema: dict[str, Any] | None = None, model: str | None = None
+    ) -> str:
         import json
 
         system = messages[0]["content"] if messages else ""
@@ -190,14 +200,30 @@ class DevFakeLLMClient:
                     ],
                 }
             )
+        if "use the interviewer for something other than the interview" in system:
+            # Lets the off-topic reminder be tried offline: an Answer containing "off-topic test" is off-topic.
+            return json.dumps({"off_topic": "off-topic test" in last.lower()})
         if "invent the interviewer" in system:
             return json.dumps({"name": "Sam Taylor", "title": "Engineering Manager", "voice": "ash"})
         if "extract structured fields" in system:
             return json.dumps({"title": "Software Engineer", "industry": "Software", "seniority": "mid"})
+        if "list 5 to 7 topics" in last:
+            return (
+                "1. A project the candidate led: ownership.\n2. A disagreement: collaboration.\n"
+                "3. A missed deadline: accountability.\n4. Learning fast: adaptability.\n"
+                "5. A hard decision: judgment. (Plan from the fake provider.)"
+            )
         if "closing message" in last:
-            return "Thank you for your time today. I appreciated the detail in your project example. We will be in touch."
-        asked = sum(1 for m in messages if m["role"] == "assistant")
-        return self._questions[min(asked, len(self._questions) - 1)]
+            reply = "Thank you for your time today. I appreciated the detail in your project example. We will be in touch."
+        else:
+            asked = sum(1 for m in messages if m["role"] == "assistant")
+            reply = self._questions[min(asked, len(self._questions) - 1)]
+        # Chain-of-thought and Self-check prompts ask for tags around the hidden work.
+        if "<assessment>" in system:
+            return f"<assessment>The last answer lacked a measurable result. (Fake assessment.)</assessment>{reply}"
+        if "<final>" in system:
+            return f"<draft>{reply} And one more thing?</draft> Two questions; drop the second. <final>{reply}</final>"
+        return reply
 
 
 @lru_cache

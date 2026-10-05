@@ -24,6 +24,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from interview_app.db import Base
 
 QUESTION_CAP = 10
+# The Off-topic Answer that ends the Interview early (CONTEXT.md: Off-topic Answer).
+OFF_TOPIC_LIMIT = 3
 
 # Fallback Persona when the Persona call fails (spec: Persona).
 DEFAULT_PERSONA_NAME = "Alex Morgan"
@@ -62,6 +64,25 @@ class Demeanor(StrEnum):
 class Judge(StrEnum):
     LLM = "llm"
     JEV = "jev"
+
+
+# The Interviewer Models to choose from at Setup (CONTEXT.md: Interviewer Model). Labels live in the frontend.
+INTERVIEWER_MODELS = (
+    "openai/gpt-4.1-mini",
+    "openai/gpt-5-nano",
+    "anthropic/claude-sonnet-5.5",
+    "google/gemma-4-31b-it",
+)
+DEFAULT_INTERVIEWER_MODEL = INTERVIEWER_MODELS[0]
+
+
+class PromptStyle(StrEnum):
+    ZERO_SHOT = "zero_shot"
+    ONE_SHOT = "one_shot"
+    FEW_SHOT = "few_shot"
+    CHAIN_OF_THOUGHT = "chain_of_thought"
+    PLAN_AHEAD = "plan_ahead"
+    SELF_CHECK = "self_check"
 
 
 class InterviewStatus(StrEnum):
@@ -128,6 +149,13 @@ class Interview(Base):
     demeanor: Mapped[Demeanor] = mapped_column(_enum(Demeanor), default=Demeanor.FRIENDLY)
     # The chosen Judge: its Evaluation decides the status and the History score (ADR-0003).
     judge: Mapped[Judge] = mapped_column(_enum(Judge), default=Judge.LLM)
+    # Who writes the Questions and Closing, and how the prompt is built; never the Judge (CONTEXT.md).
+    interviewer_model: Mapped[str] = mapped_column(String(100), default=DEFAULT_INTERVIEWER_MODEL)
+    prompt_style: Mapped[PromptStyle] = mapped_column(_enum(PromptStyle), default=PromptStyle.ZERO_SHOT)
+    # Plan-ahead only: the plan written before the first Question, part of the Interviewer's Notes.
+    plan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Off-topic Answers so far; the third ends the Interview (CONTEXT.md: Off-topic Answer).
+    off_topic_count: Mapped[int] = mapped_column(Integer, default=0)
     # Persona: invented per Interview, never copied by Practice again.
     persona_name: Mapped[str] = mapped_column(String(100), default=DEFAULT_PERSONA_NAME)
     persona_title: Mapped[str] = mapped_column(String(200), default=DEFAULT_PERSONA_TITLE)
@@ -178,6 +206,8 @@ class Message(Base):
     role: Mapped[MessageRole] = mapped_column(_enum(MessageRole))
     text: Mapped[str] = mapped_column(Text)
     position: Mapped[int] = mapped_column(Integer)
+    # Interviewer's Notes behind a Question or Closing (Chain-of-thought, Self-check); never sent while In Progress.
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     interview: Mapped[Interview] = relationship(back_populates="messages")
 

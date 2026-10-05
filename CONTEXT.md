@@ -34,6 +34,18 @@ _Avoid_: Mode, level, rude
 How the interviewer treats the candidate: Friendly (the default) or Rude. Chosen at Setup, independent of Difficulty. A Rude interviewer is impatient, curt, openly sceptical and mildly sarcastic, but stays professional: no insults, no profanity, no remarks about the person. It holds from the greeting through the Closing and is shown in the Portrait. It changes only the wording, never the voice or the Persona. Practice again keeps it. The Judge never sees it.
 _Avoid_: Tone, mood, attitude, personality
 
+**Interviewer Model**:
+The LLM that writes the interviewer's Questions and Closing, chosen at Setup from a short fixed list. It changes only the interviewer: the Judge, the Persona and the Recommended Settings always use the app's default model, so Overall Scores stay comparable. History shows it for each Interview.
+_Avoid_: Model, LLM, engine
+
+**Prompt Style**:
+How the interviewer's prompt is built, chosen at Setup: Zero-shot, One-shot, Few-shot, Chain-of-thought, Plan-ahead or Self-check. Independent of Difficulty and Demeanor: the style changes how the interviewer arrives at a Question, never what Difficulty asks for or how Demeanor sounds. The candidate only ever sees the Questions and the Closing. History shows it for each Interview.
+_Avoid_: Prompt, prompt technique, mode
+
+**Daily Budget**:
+The most the app may spend on model calls in one day ($2 by default), counted as OpenRouter reports the key's spending for the day. Once it is used up, no new Interview can start until the next day; an Interview already In Progress always runs to its end. When the spending cannot be read, the Interview starts anyway.
+_Avoid_: Spend cap, limit, quota
+
 ### Interview
 
 **Interview**:
@@ -75,6 +87,14 @@ _Avoid_: Audio mode, call
 **Answer**:
 The candidate's plain-text reply to one Question. In a Voice Interview, the transcription of what they said, as they confirmed or edited it before sending.
 _Avoid_: Response, message
+
+**Off-topic Answer**:
+An Answer that tries to use the interviewer for something other than the Interview (for example "write my cover letter"). A weak, vague or empty Answer is not off-topic. The interviewer does not reply to it: the candidate gets a fixed reminder and the same Question stays open. The third Off-topic Answer in an Interview ends it early. Off-topic Answers are not kept as Answers, so the Judge never sees them.
+_Avoid_: Misuse, abuse, spam, Flagged Answer
+
+**Interviewer's Notes**:
+The interviewer's hidden work for one Interview, written by some Prompt Styles: the plan, the thinking before a Question, or the draft before the final Question. Never shown during the Interview; shown after it ends, next to the Evaluation. The Judge never sees them.
+_Avoid_: Reasoning, chain of thought, scratchpad, thoughts
 
 **Closing**:
 The interviewer's final message after the last Answer or an early end, referencing what was discussed. It is not a Question and does not count toward the cap.

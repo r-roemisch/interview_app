@@ -1,19 +1,35 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from interview_app.budget import get_daily_spend
+from interview_app.config import get_settings
 from interview_app.db import get_db, get_session_factory
 from interview_app.images import ImageClient, get_image_client, image_type
 from interview_app.jev import JevClient, get_jev_client
 from interview_app.llm import LLMClient, LLMUnavailable, get_llm_client
-from interview_app.models import Demeanor, Difficulty, Interview, InterviewStatus, Judge, PortraitStatus, Seniority
-from interview_app.schemas import EvaluationOut, HistoryRow, InterviewOut
+from interview_app.models import (
+    DEFAULT_INTERVIEWER_MODEL,
+    INTERVIEWER_MODELS,
+    Demeanor,
+    Difficulty,
+    Interview,
+    InterviewStatus,
+    Judge,
+    PortraitStatus,
+    PromptStyle,
+    Seniority,
+)
+from interview_app.schemas import EvaluationOut, HistoryRow, InterviewOut, MessageNotes, NotesOut
 from interview_app.services import interview as svc
 from interview_app.services import judge
 from interview_app.services import portrait as portrait_svc
+from interview_app.services.off_topic import OffTopicCheck, get_off_topic_check
 
 router = APIRouter(prefix="/interviews", tags=["interviews"])
 
@@ -27,6 +43,8 @@ class InterviewCreate(BaseModel):
     demeanor: Demeanor = Demeanor.FRIENDLY
     cv: str | None = Field(default=None, max_length=20_000)
     judge: Judge = Judge.LLM
+    interviewer_model: Literal[INTERVIEWER_MODELS] = DEFAULT_INTERVIEWER_MODEL  # type: ignore[valid-type]
+    prompt_style: PromptStyle = PromptStyle.ZERO_SHOT
     voice_interview: bool = False
     portrait: bool = True
 
@@ -44,6 +62,16 @@ def load_interview(interview_id: int, db: Session = Depends(get_db)) -> Intervie
 
 def _llm_unavailable(exc: LLMUnavailable) -> HTTPException:
     return HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"The interviewer is unavailable: {exc}")
+
+
+def _check_daily_budget(spend: float | None) -> None:
+    """Guard 2: no new Interview once today's spending reaches the Daily Budget (CONTEXT.md)."""
+    budget = get_settings().daily_budget
+    if spend is not None and spend >= budget:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"Today's budget of ${budget:.2f} is used up (${spend:.2f} spent). Try again tomorrow.",
+        )
 
 
 def _judge_trigger(background: BackgroundTasks, session_factory, llm: LLMClient, jev: JevClient):
@@ -72,7 +100,9 @@ def create_interview(
     llm: LLMClient = Depends(get_llm_client),
     session_factory=Depends(get_session_factory),
     images: ImageClient = Depends(get_image_client),
+    daily_spend: float | None = Depends(get_daily_spend),
 ) -> Interview:
+    _check_daily_budget(daily_spend)
     try:
         interview = svc.start_interview(
             db,
@@ -85,6 +115,8 @@ def create_interview(
             demeanor=body.demeanor,
             cv=body.cv,
             judge=body.judge,
+            interviewer_model=body.interviewer_model,
+            prompt_style=body.prompt_style,
             voice_interview=body.voice_interview,
             portrait=body.portrait,
         )
@@ -104,6 +136,8 @@ def list_interviews(db: Session = Depends(get_db)) -> list[HistoryRow]:
             created_at=i.created_at,
             status=i.status,
             judge=i.judge,
+            interviewer_model=i.interviewer_model,
+            prompt_style=i.prompt_style,
             overall_score=i.evaluation.overall_score if i.evaluation else None,
         )
         for i in rows
@@ -124,10 +158,11 @@ def submit_answer(
     llm: LLMClient = Depends(get_llm_client),
     session_factory=Depends(get_session_factory),
     jev: JevClient = Depends(get_jev_client),
+    off_topic: OffTopicCheck = Depends(get_off_topic_check),
 ) -> Interview:
     trigger = _judge_trigger(background, session_factory, llm, jev)
     try:
-        return svc.submit_answer(db, llm, interview, body.text, on_closing=trigger)
+        return svc.submit_answer(db, llm, interview, body.text, on_closing=trigger, off_topic=off_topic)
     except svc.InterviewStateError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except LLMUnavailable as exc:
@@ -150,6 +185,17 @@ def end_interview(
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except LLMUnavailable as exc:
         raise _llm_unavailable(exc) from exc
+
+
+@router.get("/{interview_id}/notes", response_model=NotesOut)
+def get_notes(interview: Interview = Depends(load_interview)) -> NotesOut:
+    """The Interviewer's Notes, never while the Interview is In Progress (CONTEXT.md)."""
+    if interview.status == InterviewStatus.IN_PROGRESS:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The interviewer's notes are shown after the interview")
+    return NotesOut(
+        plan=interview.plan,
+        messages=[MessageNotes(message_id=m.id, notes=m.notes) for m in interview.messages if m.notes],
+    )
 
 
 @router.get("/{interview_id}/portrait")
@@ -218,6 +264,8 @@ def rerun_evaluation(
         raise HTTPException(status.HTTP_409_CONFLICT, "Interview has not ended")
     if interview.status == InterviewStatus.JUDGING:
         raise HTTPException(status.HTTP_409_CONFLICT, "The Judge is still running")
+    if interview.answer_count == 0:
+        raise HTTPException(status.HTTP_409_CONFLICT, "There are no answers to evaluate.")
     judge.replace_evaluation(db, interview, interview.judge, None)
     interview.status = InterviewStatus.JUDGING
     db.commit()
@@ -241,9 +289,12 @@ def practice_again(
     llm: LLMClient = Depends(get_llm_client),
     session_factory=Depends(get_session_factory),
     images: ImageClient = Depends(get_image_client),
+    daily_spend: float | None = Depends(get_daily_spend),
 ) -> Interview:
-    """New Interview from the same Job snapshot, Difficulty, Demeanor, CV, Judge, voice and Portrait settings;
+    """New Interview from the same Job snapshot, Difficulty, Demeanor, CV, Judge, Interviewer Model, Prompt Style,
+    voice and Portrait settings;
     fresh Persona, so a fresh Portrait."""
+    _check_daily_budget(daily_spend)
     try:
         again = svc.start_interview(
             db,
@@ -256,6 +307,8 @@ def practice_again(
             demeanor=interview.demeanor,
             cv=interview.cv,
             judge=interview.judge,
+            interviewer_model=interview.interviewer_model,
+            prompt_style=interview.prompt_style,
             voice_interview=interview.voice_interview,
             portrait=interview.portrait is not None,
         )

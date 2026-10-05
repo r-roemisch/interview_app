@@ -7,7 +7,17 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from interview_app.models import QUESTION_CAP, Demeanor, Difficulty, InterviewStatus, Judge, MessageRole, Seniority, Verdict
+from interview_app.models import (
+    QUESTION_CAP,
+    Demeanor,
+    Difficulty,
+    InterviewStatus,
+    Judge,
+    MessageRole,
+    PromptStyle,
+    Seniority,
+    Verdict,
+)
 
 
 class MessageOut(BaseModel):
@@ -30,6 +40,8 @@ class InterviewOut(BaseModel):
     difficulty: Difficulty
     demeanor: Demeanor
     judge: Judge
+    interviewer_model: str
+    prompt_style: PromptStyle
     persona_name: str
     persona_title: str
     persona_voice: str
@@ -38,10 +50,23 @@ class InterviewOut(BaseModel):
     portrait: Literal["none", "pending", "ready", "failed"] = Field(validation_alias="portrait_state")
     status: InterviewStatus
     ended_early: bool
+    off_topic_count: int
     created_at: datetime
     question_count: int
     question_cap: int = QUESTION_CAP
     messages: list[MessageOut]
+
+
+class MessageNotes(BaseModel):
+    message_id: int
+    notes: str
+
+
+class NotesOut(BaseModel):
+    """The Interviewer's Notes of an ended Interview (CONTEXT.md)."""
+
+    plan: str | None
+    messages: list[MessageNotes]
 
 
 class HistoryRow(BaseModel):
@@ -50,6 +75,8 @@ class HistoryRow(BaseModel):
     created_at: datetime
     status: InterviewStatus
     judge: Judge
+    interviewer_model: str
+    prompt_style: PromptStyle
     overall_score: int | None
 
 

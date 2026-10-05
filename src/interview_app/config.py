@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     llm_model: str = "google/gemma-4-31b-it:free"
     jev_model: str = "typesafe/jev-1.13"
+    # Guard 1: the cheap model that checks every Answer for being off-topic, whatever the Interviewer Model
+    off_topic_model: str = "openai/gpt-5-nano"
+    # Guard 2: dollars a day; once OpenRouter counts this much spent today, no new Interview starts
+    daily_budget: float = 2.0
     # Voice Interviews: an audio chat model for both directions (ADR-0005)
     stt_model: str = "openai/gpt-audio-mini"
     tts_model: str = "openai/gpt-audio-mini"

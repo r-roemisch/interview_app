@@ -1,0 +1,41 @@
+GPT-5.5	$5 / $30	
+2	Claude Opus 4.7	$5 / $25	
+3	GPT-5.6 Sol	$4 / $20	Promo through at least Nov 21, 2026; list rate is $5/$30
+4	GPT-5.4	$2.50 / $15	
+5	GPT-5.2	$1.75 / $14	
+6	GPT-5.2-Codex	$1.75 / $14	
+7	GPT-5.6 Terra	$2 / $12	
+8	GPT-4o (incl. 2024-11-20)	$2.50 / $10	
+9	GPT Audio	$2.50 / $10	Text tokens; audio tokens billed higher
+10	GPT-6 Sol	$2 / $10	
+11	Claude Sonnet 5.5 (= Sonnet Latest)	$2 / $10	
+12	Sonar Deep Research	$2 / $8	Reasoning tokens $3/1M plus $5 per 1K searches; a call can run $0.40 to over $1, so per request it's often the priciest here
+13	Grok 4.5	$2 / $6	
+14	Claude Haiku 4.5	$1 / $5	
+15	GPT-5.4 Mini	$0.75 / $4.50	"GPT Mini Latest" most likely resolves here; check in your platform
+16	GLM 5.2	$1.40 / $4.40	Z.ai first-party rate; third-party hosts differ
+17	Claude 3.5 Haiku	$0.80 / $4	
+18	DeepSeek V4 Pro (0813, 0423)	$1.32 / $3.96	Peak rate; off-peak is half ($0.66/$1.98)
+19	Gemini 3.8 Flash (= Gemini Flash Latest)	$0.75 / $3.75	Intro price; becomes $1.50/$7.50 on Jan 1, 2027
+20	Gemini 3.7 Flash	$0.75 / $3.75	Same intro deal
+21	Gemini 2.5 Flash	$0.30 / $2.50	
+22	Gemini 3.5 Flash Lite	$0.30 / $2.50	
+23	GPT Audio Mini	$0.60 / $2.40	Text tokens; audio extra
+24	GPT-5 Mini	$0.25 / $2	
+25	Gemini 3.7 Flash (batch)	$0.375 / $1.875	
+26	GPT-4.1 Mini	$0.40 / $1.60	
+27	GPT-3.5 Turbo	$0.50 / $1.50	
+28	Gemini 3.1 Flash Lite	$0.25 / $1.50	
+29	Claude 3 Haiku	$0.25 / $1.25	
+30	GPT-5.4 Nano	$0.20 / $1.25	
+31	DeepSeek V4.1 Flash (= DeepSeek Flash Latest / V4 Flash Latest)	$0.30 / $1.20	Peak; off-peak $0.15/$0.60. V4 Flash 0423/0731 ($0.14/$0.28) were retired Sep 10 and now route here
+32	MiniMax M2.7	$0.30 / $1.20	
+33	GPT-5.6 Luna	$0.20 / $1.20	
+34	GPT-4o-mini	$0.15 / $0.60	
+35	GPT-6 Luna	$0.10 / $0.50	
+36	Gemma 4 31B	$0.14 / $0.40	
+37	GPT-4.1 Nano	$0.10 / $0.40	
+38	Gemini 2.5 Flash Lite	$0.10 / $0.40	
+39	GPT-5 Nano	$0.05 / $0.40	
+40	GPT-6 Luna (batch)	$0.05 / $0.25	
+41	Jev 1.13 (= Jev Latest)	
