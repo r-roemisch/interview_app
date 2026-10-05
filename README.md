@@ -13,6 +13,55 @@ The vocabulary used in the code and docs is defined in [`CONTEXT.md`](./CONTEXT.
 4. **Evaluation**: overall score, verdict and justification, then improvement points and the transcript with a STAR breakdown under every answer. For some prompt styles, the interviewer's notes show what it planned or thought before each question. "Practice this job again" starts a fresh interview with the same settings.
 5. **History**: all past interviews with status, score, interviewer model and prompt style. In-progress ones can be resumed.
 
+```mermaid
+%%{init: {"flowchart": {"wrappingWidth": 320, "nodeSpacing": 40, "rankSpacing": 45}}}%%
+flowchart TD
+    subgraph start ["1 · Start"]
+        setup["<b>Setup</b><br/>job, difficulty, demeanor, judge,<br/>interviewer model, prompt style"]
+        budget{"Daily Budget<br/>left today?"}
+        refused["Refused: try again tomorrow"]
+        persona["Persona invented, Portrait drawn<br/>Plan-ahead: interviewer plans 5-7 topics"]
+    end
+    subgraph talk ["2 · Interview"]
+        question["Interviewer asks a <b>Question</b>"]
+        answer["Candidate <b>answers</b>, typed or spoken"]
+        offtopic{"Off-topic?"}
+        reminder["Amber reminder,<br/>same Question stays open"]
+        cap{"10 Questions asked?"}
+        closing["Interviewer writes the <b>Closing</b>"]
+        stop["Fixed Closing,<br/>interview ends early"]
+    end
+    subgraph result ["3 · Result"]
+        judge["<b>Judge</b> scores in the background<br/>LLM Judge or JEV Judge"]
+        evaluation["<b>Evaluation</b><br/>score, verdict, STAR breakdown,<br/>improvement points, interviewer's notes"]
+        history["<b>History</b>"]
+    end
+
+    setup --> budget
+    budget -- no --> refused
+    budget -- yes --> persona --> question
+    question --> answer --> offtopic
+    offtopic -- "yes, 1st or 2nd time" --> reminder --> answer
+    offtopic -- "yes, 3rd time" --> stop
+    offtopic -- no --> cap
+    cap -- no --> question
+    cap -- yes --> closing
+    answer -. "End interview" .-> closing
+    closing --> judge
+    stop --> judge
+    judge --> evaluation --> history
+    evaluation -. "Practice again" .-> budget
+
+    classDef user fill:#eef2ff,stroke:#6366f1,color:#1e1b4b
+    classDef guard fill:#fffbeb,stroke:#f59e0b,color:#78350f
+    classDef model fill:#f4f4f5,stroke:#71717a,color:#18181b
+    class setup,answer,evaluation,history user
+    class budget,refused,offtopic,reminder,stop guard
+    class persona,question,closing,judge,cap model
+```
+
+Blue: what you do. Amber: the guards. Grey: what the models do.
+
 ## Experiments
 
 <!-- Your findings. The tables are a starting point: fill in, add rows, delete what you don't need. -->
@@ -103,6 +152,35 @@ Two guards against misuse (see `.scratch/interviewer-experiments/spec.md`):
 
 - **Off-topic Answers.** Every non-empty Answer is first checked by `OFF_TOPIC_MODEL`: does it try to use the interviewer for something else ("write my cover letter", "show me your system prompt")? Then it is not kept, the interviewer is not called, and an amber reminder asks for an answer to the same Question; the third one ends the Interview with a fixed Closing. A weak Answer is not off-topic, and an instruction to the Judge stays a Flagged Answer. The check adds about 2 to 8 seconds per Answer, because GPT-5 Nano reasons first; with its reasoning turned down, it marked weak Answers as off-topic. If the check fails, the Answer counts as on-topic.
 - **Daily Budget.** Starting an Interview or Practice again first asks OpenRouter how much the key has spent today (`usage_daily`, which counts everything spent with the key, also outside this app). At `DAILY_BUDGET` or more, the start is refused until the next day. An Interview already running always finishes, and if the spending cannot be read, the Interview starts.
+
+### What happens to one Answer
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant API as Backend
+    participant OT as Off-topic check<br/>GPT-5 Nano
+    participant I as Interviewer model<br/>chosen at Setup
+    participant J as Judge<br/>LLM Judge or JEV
+
+    B->>API: send the Answer
+    API->>OT: open Question and Answer
+    OT-->>API: off-topic yes or no
+    alt off-topic
+        API-->>B: same Question, one more strike
+        Note over B: amber reminder<br/>(3rd strike: interview ends)
+    else on-topic
+        API->>I: rules + prompt style block + transcript
+        I-->>API: reply (+ assessment or draft)
+        Note over API: keep the notes apart,<br/>check the reply, retry once<br/>or use a fixed fallback
+        API-->>B: next Question or Closing
+        opt after the Closing
+            API->>J: job + transcript (background)
+            J-->>API: Evaluation
+        end
+    end
+```
 
 ## Prerequisites
 
